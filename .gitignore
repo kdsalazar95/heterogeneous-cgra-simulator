@@ -1,0 +1,10 @@
+.venv
+
+__pycache__/
+os
+sys
+.python-version
+historial_busqueda_dijkstra.csv
+historial_entrenamiento.csv
+progreso_entrenamiento.png
+.pytest_cache/
