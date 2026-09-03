@@ -107,6 +107,10 @@ class PE:
             self._register[inst["regC"]] = self._register[inst["regA"]] + self._register[inst["regB"]]
         elif op == "sub":
             self._register[inst["regC"]] = self._register[inst["regA"]] - self._register[inst["regB"]]
+        elif op == "mul":
+            self._register[inst["regC"]] = self._register[inst["regA"]] * self._register[inst["regB"]]
+        elif op == "div":
+            self._register[inst["regC"]] = self._register[inst["regA"]] / self._register[inst["regB"]]
         elif op == "mov":
             self._register[inst["regC"]] = inst["imm"]
         # --- enviar datos a un vecino ---
@@ -194,6 +198,30 @@ def conectar_malla(malla):
     """
     conectar_malla_horizontal(malla)
     conectar_malla_vertical(malla)
+
+
+def crear_par_de_pes(direccion="horizontal"):
+    """Crea y conecta rápidamente solo 2 PEs, sin tener que armar una
+    malla completa. Útil para pruebas o ejemplos donde solo hacen
+    falta 2 PEs comunicándose.
+
+    direccion: "horizontal" -> quedan uno a la izquierda del otro
+               (se pueden hablar con send_e/recv_w y send_w/recv_e).
+               "vertical"   -> quedan uno arriba del otro
+               (se pueden hablar con send_s/recv_n y send_n/recv_s).
+
+    Devuelve una tupla (pe0, pe1).
+    """
+    if direccion == "horizontal":
+        malla = crear_malla(1, 2)
+        conectar_malla_horizontal(malla)
+        return malla[0][0], malla[0][1]
+    elif direccion == "vertical":
+        malla = crear_malla(2, 1)
+        conectar_malla_vertical(malla)
+        return malla[0][0], malla[1][0]
+    else:
+        raise ValueError('direccion debe ser "horizontal" o "vertical"')
 
 
 if __name__ == "__main__":
