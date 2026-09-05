@@ -1,0 +1,28 @@
+// PE00 instruction list
+// Mesh position: top-left
+// One instruction per execution cycle.
+
+00: MOV acc, 0.0
+01: LD rA, a[0]
+02: LD rB, b[0]
+03: ADD rC, rA, rB
+04: ST c[0], rC
+05: LD rA, a[4]
+06: LD rB, b[4]
+07: ADD rC, rA, rB
+08: ST c[4], rC
+09: LD rA, a[8]
+10: LD rB, b[8]
+11: ADD rC, rA, rB
+12: ST c[8], rC
+13: LD rC, c[0]
+14: ADD acc, acc, rC
+15: LD rC, c[4]
+16: ADD acc, acc, rC
+17: LD rC, c[8]
+18: ADD acc, acc, rC
+19: RECV east, rT
+20: ADD acc, acc, rT
+21: RECV south, rT
+22: ADD acc, acc, rT
+23: ST result[0], acc

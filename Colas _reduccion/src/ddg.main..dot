@@ -1,0 +1,35 @@
+digraph "DDG for 'main.'" {
+	label="DDG for 'main.'";
+
+	Node0x5b16c075cf40 [shape=record,label="{\<kind:root\>\nroot\n}"];
+	Node0x5b16c075cf40 -> Node0x5b16c0789460[label="[rooted]"];
+	Node0x5b16c075cf40 -> Node0x5b16c0791090[label="[rooted]"];
+	Node0x5b16c075cf40 -> Node0x5b16c07911b0[label="[rooted]"];
+	Node0x5b16c075cf40 -> Node0x5b16c0791330[label="[rooted]"];
+	Node0x5b16c0791330 [shape=record,label="{\<kind:single-instruction\>\n  br label %28, !llvm.loop !8\n}"];
+	Node0x5b16c07911b0 [shape=record,label="{\<kind:single-instruction\>\n  br label %38\n}"];
+	Node0x5b16c0791090 [shape=record,label="{\<kind:single-instruction\>\n  %36 = load float, ptr %6, align 4\n}"];
+	Node0x5b16c0791090 -> Node0x5b16c07910f0[label="[def-use]"];
+	Node0x5b16c0791090 -> Node0x5b16c0791150[label="[consistent anti [S|<]!]"];
+	Node0x5b16c0789460 [shape=record,label="{\<kind:single-instruction\>\n  %29 = load i32, ptr %7, align 4\n}"];
+	Node0x5b16c0789460 -> Node0x5b16c0789580[label="[def-use]"];
+	Node0x5b16c0789460 -> Node0x5b16c0789700[label="[consistent input [S|<]!]"];
+	Node0x5b16c0789460 -> Node0x5b16c0791210[label="[consistent input [S|<]!]"];
+	Node0x5b16c0789460 -> Node0x5b16c07912d0[label="[consistent anti [S|<]!]"];
+	Node0x5b16c0789700 [shape=record,label="{\<kind:single-instruction\>\n  %32 = load i32, ptr %7, align 4\n}"];
+	Node0x5b16c0789700 -> Node0x5b16c0789760[label="[def-use]"];
+	Node0x5b16c0789700 -> Node0x5b16c0791210[label="[consistent input [S|<]!]"];
+	Node0x5b16c0789700 -> Node0x5b16c07912d0[label="[consistent anti [S|<]!]"];
+	Node0x5b16c0791210 [shape=record,label="{\<kind:single-instruction\>\n  %39 = load i32, ptr %7, align 4\n}"];
+	Node0x5b16c0791210 -> Node0x5b16c0791270[label="[def-use]"];
+	Node0x5b16c0791210 -> Node0x5b16c07912d0[label="[consistent anti [S|<]!]"];
+	Node0x5b16c0791270 [shape=record,label="{\<kind:single-instruction\>\n  %40 = add nsw i32 %39, 1\n}"];
+	Node0x5b16c0791270 -> Node0x5b16c07912d0[label="[def-use]"];
+	Node0x5b16c07912d0 [shape=record,label="{\<kind:single-instruction\>\n  store i32 %40, ptr %7, align 4\n}"];
+	Node0x5b16c0789760 [shape=record,label="{\<kind:multi-instruction\>\n  %33 = sext i32 %32 to i64\n  %34 = getelementptr inbounds [12 x float], ptr %4, i64 0, i64 %33\n  %35 = load float, ptr %34, align 4\n}"];
+	Node0x5b16c0789760 -> Node0x5b16c07910f0[label="[def-use]"];
+	Node0x5b16c07910f0 [shape=record,label="{\<kind:single-instruction\>\n  %37 = fadd float %36, %35\n}"];
+	Node0x5b16c07910f0 -> Node0x5b16c0791150[label="[def-use]"];
+	Node0x5b16c0791150 [shape=record,label="{\<kind:single-instruction\>\n  store float %37, ptr %6, align 4\n}"];
+	Node0x5b16c0789580 [shape=record,label="{\<kind:multi-instruction\>\n  %30 = icmp slt i32 %29, 12\n  br i1 %30, label %31, label %41\n}"];
+}

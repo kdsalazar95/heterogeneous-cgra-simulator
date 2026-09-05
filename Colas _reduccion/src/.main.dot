@@ -1,0 +1,23 @@
+digraph "CFG for 'main' function" {
+	label="CFG for 'main' function";
+
+	Node0x632dedded8f0 [shape=record,color="#3d50c3ff", style=filled, fillcolor="#d6524470" fontname="Courier",label="{0:\l|  %1 = alloca i32, align 4\l  %2 = alloca [12 x float], align 16\l  %3 = alloca [12 x float], align 16\l  %4 = alloca [12 x float], align 16\l  %5 = alloca i32, align 4\l  %6 = alloca float, align 4\l  %7 = alloca i32, align 4\l  store i32 0, ptr %1, align 4\l  call void @llvm.memcpy.p0.p0.i64(ptr align 16 %2, ptr align 16\l... @__const.main.a, i64 48, i1 false)\l  call void @llvm.memcpy.p0.p0.i64(ptr align 16 %3, ptr align 16\l... @__const.main.b, i64 48, i1 false)\l  call void @llvm.memset.p0.i64(ptr align 16 %4, i8 0, i64 48, i1 false)\l  store i32 0, ptr %5, align 4\l  br label %8\l}"];
+	Node0x632dedded8f0 -> Node0x632deddf1ef0[tooltip="0 -> 8\nProbability 100.00%" ];
+	Node0x632deddf1ef0 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870" fontname="Courier",label="{8:\l|  %9 = load i32, ptr %5, align 4\l  %10 = icmp slt i32 %9, 12\l  br i1 %10, label %11, label %27\l|{<s0>T|<s1>F}}"];
+	Node0x632deddf1ef0:s0 -> Node0x632deddf2070[tooltip="8 -> 11\nProbability 96.88%" ];
+	Node0x632deddf1ef0:s1 -> Node0x632deddf20c0[tooltip="8 -> 27\nProbability 3.12%" ];
+	Node0x632deddf2070 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870" fontname="Courier",label="{11:\l|  %12 = load i32, ptr %5, align 4\l  %13 = sext i32 %12 to i64\l  %14 = getelementptr inbounds [12 x float], ptr %2, i64 0, i64 %13\l  %15 = load float, ptr %14, align 4\l  %16 = load i32, ptr %5, align 4\l  %17 = sext i32 %16 to i64\l  %18 = getelementptr inbounds [12 x float], ptr %3, i64 0, i64 %17\l  %19 = load float, ptr %18, align 4\l  %20 = fadd float %15, %19\l  %21 = load i32, ptr %5, align 4\l  %22 = sext i32 %21 to i64\l  %23 = getelementptr inbounds [12 x float], ptr %4, i64 0, i64 %22\l  store float %20, ptr %23, align 4\l  br label %24\l}"];
+	Node0x632deddf2070 -> Node0x632deddf28b0[tooltip="11 -> 24\nProbability 100.00%" ];
+	Node0x632deddf28b0 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870" fontname="Courier",label="{24:\l|  %25 = load i32, ptr %5, align 4\l  %26 = add nsw i32 %25, 1\l  store i32 %26, ptr %5, align 4\l  br label %8, !llvm.loop !6\l}"];
+	Node0x632deddf28b0 -> Node0x632deddf1ef0[tooltip="24 -> 8\nProbability 100.00%" ];
+	Node0x632deddf20c0 [shape=record,color="#3d50c3ff", style=filled, fillcolor="#d6524470" fontname="Courier",label="{27:\l|  store float 0.000000e+00, ptr %6, align 4\l  store i32 0, ptr %7, align 4\l  br label %28\l}"];
+	Node0x632deddf20c0 -> Node0x632deddf3750[tooltip="27 -> 28\nProbability 100.00%" ];
+	Node0x632deddf3750 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870" fontname="Courier",label="{28:\l|  %29 = load i32, ptr %7, align 4\l  %30 = icmp slt i32 %29, 12\l  br i1 %30, label %31, label %41\l|{<s0>T|<s1>F}}"];
+	Node0x632deddf3750:s0 -> Node0x632deddf38d0[tooltip="28 -> 31\nProbability 96.88%" ];
+	Node0x632deddf3750:s1 -> Node0x632deddf3920[tooltip="28 -> 41\nProbability 3.12%" ];
+	Node0x632deddf38d0 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870" fontname="Courier",label="{31:\l|  %32 = load i32, ptr %7, align 4\l  %33 = sext i32 %32 to i64\l  %34 = getelementptr inbounds [12 x float], ptr %4, i64 0, i64 %33\l  %35 = load float, ptr %34, align 4\l  %36 = load float, ptr %6, align 4\l  %37 = fadd float %36, %35\l  store float %37, ptr %6, align 4\l  br label %38\l}"];
+	Node0x632deddf38d0 -> Node0x632deddf3db0[tooltip="31 -> 38\nProbability 100.00%" ];
+	Node0x632deddf3db0 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870" fontname="Courier",label="{38:\l|  %39 = load i32, ptr %7, align 4\l  %40 = add nsw i32 %39, 1\l  store i32 %40, ptr %7, align 4\l  br label %28, !llvm.loop !8\l}"];
+	Node0x632deddf3db0 -> Node0x632deddf3750[tooltip="38 -> 28\nProbability 100.00%" ];
+	Node0x632deddf3920 [shape=record,color="#3d50c3ff", style=filled, fillcolor="#d6524470" fontname="Courier",label="{41:\l|  ret i32 0\l}"];
+}

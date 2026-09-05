@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(_raiz_proyecto, "src"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import test_queue_pe  # el archivo de pruebas normal, sin tocarlo
+import test_run_cgra
 
 
 # Nombres de sección más amigables para cada clase de prueba.
@@ -24,6 +25,7 @@ NOMBRES_DE_SECCION = {
     "TestConectarMallaHorizontal": "Conexión horizontal (este \u2194 oeste)",
     "TestConectarMallaVertical": "Conexión vertical (norte \u2194 sur)",
     "TestComunicacionBidireccional": "Comunicación entre dos PEs (ida y vuelta)",
+    "TestEjecucionCGRA": "Ejecución de programas de la CGRA",
 }
 
 
@@ -88,6 +90,7 @@ def main():
         test_queue_pe.TestConectarMallaHorizontal,
         test_queue_pe.TestConectarMallaVertical,
         test_queue_pe.TestComunicacionBidireccional,
+        test_run_cgra.TestEjecucionCGRA,
     ]
     suite = unittest.TestSuite()
     for clase in orden_de_clases:

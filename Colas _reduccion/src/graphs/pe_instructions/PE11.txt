@@ -1,0 +1,28 @@
+// PE11 instruction list
+// Mesh position: bottom-right
+// One instruction per execution cycle.
+
+00: MOV acc, 0.0
+01: LD rA, a[3]
+02: LD rB, b[3]
+03: ADD rC, rA, rB
+04: ST c[3], rC
+05: LD rA, a[7]
+06: LD rB, b[7]
+07: ADD rC, rA, rB
+08: ST c[7], rC
+09: LD rA, a[11]
+10: LD rB, b[11]
+11: ADD rC, rA, rB
+12: ST c[11], rC
+13: LD rC, c[3]
+14: ADD acc, acc, rC
+15: LD rC, c[7]
+16: ADD acc, acc, rC
+17: LD rC, c[11]
+18: ADD acc, acc, rC
+19: SEND west, acc
+20: NOP
+21: NOP
+22: NOP
+23: NOP

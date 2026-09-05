@@ -29,6 +29,8 @@ class QUEUE:
 
     def pop(self):
         """Saca y devuelve el dato más antiguo de la cola (FIFO)."""
+        if not self.datos:
+            raise RuntimeError("RECV intentó leer una cola FIFO vacía")
         return self.datos.pop(0)  # FIFO: sale el primero que entró
 
 
@@ -70,12 +72,33 @@ class PE:
         self._queue_e_out = None  # para enviar datos hacia el este
         self._queue_e_in = None   # para recibir datos que vienen del este
 
+    # Nombres definidos por los skills para los registros del ISA textual.
+    # Los enteros se siguen aceptando para no romper los programas y pruebas
+    # existentes que usan registros 0..15 directamente.
+    REGISTROS = {
+        "rA": 0,
+        "rB": 1,
+        "rC": 2,
+        "rT": 3,
+        "acc": 4,
+    }
+
+    def _indice_registro(self, registro):
+        """Convierte un nombre ISA (por ejemplo ``rA``) o un entero a índice."""
+        if isinstance(registro, str):
+            if registro not in self.REGISTROS:
+                raise ValueError(f"Registro desconocido: {registro}")
+            return self.REGISTROS[registro]
+        if not isinstance(registro, int) or not 0 <= registro < len(self._register):
+            raise ValueError(f"Índice de registro inválido: {registro}")
+        return registro
+
     def load_instructions(self, instructions):
         """Carga un programa (lista de instrucciones) y reinicia el PC."""
         self._instructions = instructions
         self._pc = 0
 
-    def step(self):
+    def step(self, memoria=None):
         """Ejecuta una sola instrucción y avanza el PC.
 
         Devuelve False si ya no quedan instrucciones por ejecutar,
@@ -84,53 +107,88 @@ class PE:
         if self._pc >= len(self._instructions):
             return False
         inst = self._instructions[self._pc]
-        self.execute(inst)
+        self.execute(inst, memoria)
         self._pc += 1
         return True
 
-    def run(self):
+    def run(self, memoria=None):
         """Ejecuta todas las instrucciones restantes, una por una,
         hasta que no queden más."""
-        while self.step():
+        while self.step(memoria):
             pass
 
-    def execute(self, inst):
+    def execute(self, inst, memoria=None):
         """Ejecuta una única instrucción según su operación (`inst["op"]`):
         add/sub/mov operan sobre los registros locales; send_n/send_s/
         send_w/send_e mandan un dato al vecino correspondiente; recv_n/
         recv_s/recv_w/recv_e reciben un dato de ese vecino. La
         comunicación funciona en las 4 direcciones y en ambos sentidos.
         """
-        op = inst["op"]
+        op = inst["op"].lower()
+
+        # El formato antiguo usa regA/regB/regC. El parser del ISA textual
+        # utiliza dst/src1/src2 para reflejar la sintaxis ADD dst, src1, src2.
+        def reg(nombre_antiguo, nombre_nuevo):
+            return self._indice_registro(inst.get(nombre_nuevo, inst.get(nombre_antiguo)))
+
+        def banco_e_indice():
+            if memoria is None:
+                raise RuntimeError(f"{op.upper()} requiere memoria compartida")
+            banco = inst["bank"]
+            indice = inst["index"]
+            if banco not in memoria:
+                raise KeyError(f"Banco de memoria inexistente: {banco}")
+            if not isinstance(indice, int) or not 0 <= indice < len(memoria[banco]):
+                raise IndexError(f"Índice inválido: {banco}[{indice}]")
+            return banco, indice
 
         if op == "add":
-            self._register[inst["regC"]] = self._register[inst["regA"]] + self._register[inst["regB"]]
+            self._register[reg("regC", "dst")] = self._register[reg("regA", "src1")] + self._register[reg("regB", "src2")]
         elif op == "sub":
-            self._register[inst["regC"]] = self._register[inst["regA"]] - self._register[inst["regB"]]
+            self._register[reg("regC", "dst")] = self._register[reg("regA", "src1")] - self._register[reg("regB", "src2")]
         elif op == "mul":
-            self._register[inst["regC"]] = self._register[inst["regA"]] * self._register[inst["regB"]]
+            self._register[reg("regC", "dst")] = self._register[reg("regA", "src1")] * self._register[reg("regB", "src2")]
         elif op == "div":
-            self._register[inst["regC"]] = self._register[inst["regA"]] / self._register[inst["regB"]]
+            self._register[reg("regC", "dst")] = self._register[reg("regA", "src1")] / self._register[reg("regB", "src2")]
         elif op == "mov":
-            self._register[inst["regC"]] = inst["imm"]
+            self._register[reg("regC", "dst")] = inst["imm"]
+        elif op == "ld":
+            banco, indice = banco_e_indice()
+            self._register[reg(None, "dst")] = memoria[banco][indice]
+        elif op == "st":
+            banco, indice = banco_e_indice()
+            memoria[banco][indice] = self._register[reg(None, "src")]
+        elif op == "nop":
+            pass
         # --- enviar datos a un vecino ---
-        elif op == "send_n":
-            self._queue_n_out.push(self._register[inst["regA"]])
-        elif op == "send_s":
-            self._queue_s_out.push(self._register[inst["regA"]])
-        elif op == "send_w":
-            self._queue_w_out.push(self._register[inst["regA"]])
-        elif op == "send_e":
-            self._queue_e_out.push(self._register[inst["regA"]])
+        elif op in {"send_n", "send_s", "send_w", "send_e", "send"}:
+            direccion = inst.get("dir", op[-1] if op != "send" else None)
+            colas_salida = {
+                "north": self._queue_n_out, "south": self._queue_s_out,
+                "west": self._queue_w_out, "east": self._queue_e_out,
+                "n": self._queue_n_out, "s": self._queue_s_out,
+                "w": self._queue_w_out, "e": self._queue_e_out,
+            }
+            cola = colas_salida.get(direccion)
+            if cola is None:
+                raise RuntimeError(f"PE{self.id} no tiene vecino hacia {direccion}")
+            self_reg = reg("regA", "src")
+            cola.push(self._register[self_reg])
         # --- recibir datos de un vecino ---
-        elif op == "recv_n":
-            self._register[inst["regA"]] = self._queue_n_in.pop()
-        elif op == "recv_s":
-            self._register[inst["regA"]] = self._queue_s_in.pop()
-        elif op == "recv_w":
-            self._register[inst["regA"]] = self._queue_w_in.pop()
-        elif op == "recv_e":
-            self._register[inst["regA"]] = self._queue_e_in.pop()
+        elif op in {"recv_n", "recv_s", "recv_w", "recv_e", "recv"}:
+            direccion = inst.get("dir", op[-1] if op != "recv" else None)
+            colas_entrada = {
+                "north": self._queue_n_in, "south": self._queue_s_in,
+                "west": self._queue_w_in, "east": self._queue_e_in,
+                "n": self._queue_n_in, "s": self._queue_s_in,
+                "w": self._queue_w_in, "e": self._queue_e_in,
+            }
+            cola = colas_entrada.get(direccion)
+            if cola is None:
+                raise RuntimeError(f"PE{self.id} no tiene vecino hacia {direccion}")
+            self._register[reg("regA", "dst")] = cola.pop()
+        else:
+            raise ValueError(f"Operación desconocida: {op}")
 
     def __repr__(self):
         """Representación en texto del PE, útil para imprimirlo y
