@@ -1,7 +1,7 @@
 /*
  * Programas de los PEs: lectura de los PE{fila}{columna}.txt, una
  * representación ya resuelta (sin textos) y la validación de
- * validar_programas() de src/programas_pe.py.
+ * validar_programas() de python/programas_pe.py.
  */
 
 #ifndef PROGRAMA_H

@@ -8,13 +8,13 @@ rules, but the Python code is the source of truth when they disagree.
 
 ## Inputs
 
-- `src/run_cgra.py`
-- `src/memoria_binaria.py` and `src/memoria_cgra.h`
-- `src/programas_pe.py`
-- `src/pe_malla.py`
-- `src/resultados.py`, `src/reportes_ciclos.py`, `src/formato_texto.py`
+- `python/run_cgra.py`
+- `python/memoria_binaria.py` and `compartido/memoria_cgra.h`
+- `python/programas_pe.py`
+- `python/pe_malla.py`
+- `python/resultados.py`, `python/reportes_ciclos.py`, `python/formato_texto.py`
 - One program folder with `pe_instructions/` and `memoria.bin`, for example
-  `src/matmul/`
+  `compartido/matmul/`
 
 ## Actions
 
@@ -22,9 +22,9 @@ rules, but the Python code is the source of truth when they disagree.
    report to the scratchpad:
 
    ```sh
-   uv run src/run_cgra.py src/matmul --reporte-ciclos <scratchpad>/matmul.txt
-   uv run src/run_cgra.py src/convolucion --reporte-ciclos <scratchpad>/convolucion.txt
-   uv run src/run_cgra.py src/reduccion --filas 8 --columnas 8 --reporte-ciclos <scratchpad>/reduccion.txt
+   uv run python/run_cgra.py compartido/matmul --reporte-ciclos <scratchpad>/matmul.txt
+   uv run python/run_cgra.py compartido/convolucion --reporte-ciclos <scratchpad>/convolucion.txt
+   uv run python/run_cgra.py compartido/reduccion --filas 8 --columnas 8 --reporte-ciclos <scratchpad>/reduccion.txt
    ```
 
    If a `memoria.bin` is missing, generate it from its `.c` as described in

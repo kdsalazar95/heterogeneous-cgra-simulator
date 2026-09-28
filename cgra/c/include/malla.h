@@ -1,6 +1,6 @@
 /*
  * Malla de PEs con registros y colas FIFO, y su ejecución ciclo a ciclo,
- * como src/pe_malla.py y ejecutar_cgra() de src/programas_pe.py.
+ * como python/pe_malla.py y ejecutar_cgra() de python/programas_pe.py.
  */
 
 #ifndef MALLA_H

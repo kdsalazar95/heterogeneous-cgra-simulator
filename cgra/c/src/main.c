@@ -1,5 +1,5 @@
 /*
- * Simulador de la CGRA en C: el mismo comportamiento que src/run_cgra.py.
+ * Simulador de la CGRA en C: el mismo comportamiento que python/run_cgra.py.
  *
  * La CGRA funciona como un procesador: no se le dice qué operación va a
  * correr. Recibe la carpeta de un programa ya compilado por los skills y
@@ -44,7 +44,7 @@ static const char USO[] =
 static const char AYUDA[] =
     "\nEjecuta un programa en una CGRA de tamaño NxM.\n\n"
     "argumentos:\n"
-    "  programa              Carpeta del programa, con pe_instructions/ y memoria.bin (ej. src/matmul)\n\n"
+    "  programa              Carpeta del programa, con pe_instructions/ y memoria.bin (ej. compartido/matmul)\n\n"
     "opciones:\n"
     "  --instrucciones DIR   Usa estos PE*.txt en vez de <programa>/pe_instructions\n"
     "  --memoria RUTA        Usa esta memoria en vez de <programa>/memoria.bin\n"
@@ -64,7 +64,7 @@ static void salir_con_uso(const char *mensaje, const char *detalle) {
 // ------------------------------------------------------------------ rutas
 
 // Normaliza una ruta como Path() de Python: sin "//", sin componentes "."
-// y sin "/" al final ("src/matmul/" -> "src/matmul").
+// y sin "/" al final ("compartido/matmul/" -> "compartido/matmul").
 static char *normalizar_ruta(const char *ruta) {
     size_t largo = strlen(ruta);
     char *normal = malloc(largo + 2), *fin = normal;

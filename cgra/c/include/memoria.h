@@ -1,6 +1,6 @@
 /*
  * memoria.bin en memoria: una memoria plana de floats y su tabla de
- * símbolos, en el formato que define src/memoria_cgra.h.
+ * símbolos, en el formato que define compartido/memoria_cgra.h.
  *
  * Una región es datos + direccion; así la ve el procesador simulado.
  */

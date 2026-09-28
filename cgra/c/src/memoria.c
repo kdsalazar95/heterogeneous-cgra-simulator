@@ -1,5 +1,5 @@
 /*
- * Lee y escribe memoria.bin, como src/memoria_binaria.py.
+ * Lee y escribe memoria.bin, como python/memoria_binaria.py.
  *
  * Formato (little-endian):
  *

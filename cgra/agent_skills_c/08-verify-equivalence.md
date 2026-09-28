@@ -13,25 +13,25 @@ Work in the scratchpad: copy each program's `memoria.bin` there, so
 1. Build clean with both compilers and no warnings:
 
    ```sh
-   make -C cgra_c clean && make -C cgra_c CC=gcc
-   make -C cgra_c BUILD=build/clang CC=clang-18
+   make -C c clean && make -C c CC=gcc
+   make -C c BUILD=build/clang CC=clang-18
    ```
 
 2. For each program, with the mesh its `PE*.txt` were built for:
 
    ```sh
-   cp src/<programa>/memoria.bin <s>/py.bin
-   cp src/<programa>/memoria.bin <s>/c.bin
-   uv run src/run_cgra.py src/<programa> [--filas F --columnas C] \
+   cp compartido/<programa>/memoria.bin <s>/py.bin
+   cp compartido/<programa>/memoria.bin <s>/c.bin
+   uv run python/run_cgra.py compartido/<programa> [--filas F --columnas C] \
        --memoria <s>/py.bin --write-back --reporte-ciclos <s>/py.txt > <s>/py.out
-   cgra_c/build/cgra src/<programa> [--filas F --columnas C] \
+   c/build/cgra compartido/<programa> [--filas F --columnas C] \
        --memoria <s>/c.bin --write-back --reporte-ciclos <s>/c.txt > <s>/c.out
    ```
 
 3. Compare:
    - **Report:** `cmp <s>/py.txt <s>/c.txt` must report no difference.
    - **Final memory:** load both `.bin` with `cargar_memoria()` of
-     `src/memoria_binaria.py` and compare region by region. Same names and
+     `python/memoria_binaria.py` and compare region by region. Same names and
      shapes; values equal within a relative tolerance of `1e-5` (Python
      computes in double, C in float).
    - **Screen output:** `diff <s>/py.out <s>/c.out`. The file paths differ
@@ -43,7 +43,7 @@ Work in the scratchpad: copy each program's `memoria.bin` there, so
    - A scratchpad copy of `pe_instructions/` with one `RECV` changed to `NOP`.
    - A missing `memoria.bin`.
 5. Check memory safety once:
-   `make -C cgra_c BUILD=build/asan OPT="-O1 -g -fsanitize=address,undefined"`
+   `make -C c BUILD=build/asan OPT="-O1 -g -fsanitize=address,undefined"`
    and run the three programs with that build; there must be no reports.
 
 ## Output

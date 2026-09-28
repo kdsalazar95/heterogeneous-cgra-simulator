@@ -9,7 +9,7 @@ Write one text file per PE containing its instruction stream.
 Inside the folder of the program:
 
 ```text
-src/<programa>/pe_instructions/
+compartido/<programa>/pe_instructions/
 ```
 
 Create the directory if it does not exist.
@@ -47,7 +47,7 @@ Each file must contain one instruction per execution cycle:
 
 ## Actions
 
-1. Create `src/<programa>/pe_instructions/` if needed.
+1. Create `compartido/<programa>/pe_instructions/` if needed.
 2. Write cycle-numbered instructions for each PE.
 3. Keep cycle numbers aligned across all files.
 4. Include `NOP` instructions for idle cycles so every file has the same cycle

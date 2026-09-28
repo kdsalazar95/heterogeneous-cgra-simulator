@@ -8,7 +8,7 @@ files disagree.
 
 ## Reading the Configuration
 
-`src/run_cgra.py` holds the mesh size near the top of the file, so it does not
+`python/run_cgra.py` holds the mesh size near the top of the file, so it does not
 have to be repeated in every request:
 
 ```python
@@ -34,18 +34,18 @@ compiler, so the program to compile is the `.c` source named in the request.
 
 ## Finding the Source
 
-Take the source from the request, either as a path (`src/matmul/matmul.c`) or
+Take the source from the request, either as a path (`compartido/matmul/matmul.c`) or
 as the program's folder name (`matmul`). Each program has its own folder, with
 the C source inside:
 
 | Program | Source | Size constants |
 |---|---|---|
-| `reduccion` | `src/reduccion/reduccion.c` | `TAMANO_VECTOR` |
-| `matmul` | `src/matmul/matmul.c` | `TAMANO_MATRIZ` |
-| `convolucion` | `src/convolucion/convolucion.c` | `TAMANO_IMAGEN`, `TAMANO_KERNEL` |
+| `reduccion` | `compartido/reduccion/reduccion.c` | `TAMANO_VECTOR` |
+| `matmul` | `compartido/matmul/matmul.c` | `TAMANO_MATRIZ` |
+| `convolucion` | `compartido/convolucion/convolucion.c` | `TAMANO_IMAGEN`, `TAMANO_KERNEL` |
 
 If the request does not name a source, ask which one to compile. A new program
-follows the same layout, `src/<programa>/<programa>.c`, and must define an
+follows the same layout, `compartido/<programa>/<programa>.c`, and must define an
 `inicializar_memoria()` function (see [Generate LLVM IR](02-generate-llvm-ir.md)).
 
 Read the sizes from the `#define` lines of that source; they may carry a
@@ -76,9 +76,9 @@ The mesh and the problem do **not** have to match:
 1. Read the mesh size from `run_cgra.py` and locate the source named in the
    request.
 2. Record its `#define` values and the resulting output size.
-3. Set `output_dir` to the program's folder, `src/<programa>/`. The IR, the
+3. Set `output_dir` to the program's folder, `compartido/<programa>/`. The IR, the
    graphs, and `memoria.bin` are generated there, and the PE files go to
-   `src/<programa>/pe_instructions/` (skill 08).
+   `compartido/<programa>/pe_instructions/` (skill 08).
 4. Check whether the `.ll`, the two `.dot` graphs, and `memoria.bin` already
    exist in that folder, and treat missing or stale ones as rebuildable
    artifacts.
@@ -93,13 +93,13 @@ Return a normalized input manifest:
 
 ```text
 programa=<folder name of the source>
-source_c=src/<programa>/<programa>.c
+source_c=compartido/<programa>/<programa>.c
 parametros=<#define values, e.g. TAMANO_MATRIZ=8>
 llvm_ir=<path or missing>
 cfg_dot=<path or missing>
 ddg_dot=<path or missing>
-memoria=src/<programa>/memoria.bin (or missing)
-output_dir=src/<programa>/
+memoria=compartido/<programa>/memoria.bin (or missing)
+output_dir=compartido/<programa>/
 mesh_filas=<int, from run_cgra.py>
 mesh_columnas=<int, from run_cgra.py>
 tile_filas=<int, mesh_filas by default>

@@ -13,7 +13,7 @@ samples yourself; if `perfilado/` has no CSVs, say so and stop.
 
 ## Inputs
 
-- `cgra_c/perfilado/`: raw CSVs, `entorno.txt`, `resumen.csv`, plots, and the
+- `c/perfilado/`: raw CSVs, `entorno.txt`, `resumen.csv`, plots, and the
   optional `perf` or `gprof` files.
 - The list of optimizations tried and their variants, from the team or the
   commit history.
@@ -25,7 +25,7 @@ samples yourself; if `perfilado/` has no CSVs, say so and stop.
    does not.
 2. Read the governor in `entorno.txt`. If the clock was not fixed to
    `performance`, say so in the methodology and in the conclusions.
-3. Write `cgra_c/REPORTE_PERFILADO.md` in Spanish, with the sections below,
+3. Write `c/REPORTE_PERFILADO.md` in Spanish, with the sections below,
    using only numbers that appear in `perfilado/`.
 
 ## Report Sections
@@ -55,5 +55,5 @@ samples yourself; if `perfilado/` has no CSVs, say so and stop.
 ## Outputs
 
 ```text
-cgra_c/REPORTE_PERFILADO.md
+c/REPORTE_PERFILADO.md
 ```

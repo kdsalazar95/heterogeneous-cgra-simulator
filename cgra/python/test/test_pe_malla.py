@@ -2,11 +2,11 @@ import os
 import sys
 import unittest
 
-# Agrega la carpeta src/ (hermana de test/, dentro de la raíz del
-# proyecto) al path, para que `from pe_malla import ...` funcione sin
-# importar desde qué carpeta se ejecute unittest.
+# Agrega la carpeta python/ (padre de test/) al path, para que
+# `from pe_malla import ...` funcione sin importar desde qué carpeta se
+# ejecute unittest.
 _raiz_proyecto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_raiz_proyecto, "src"))
+sys.path.insert(0, _raiz_proyecto)
 
 from pe_malla import crear_malla, conectar_malla_horizontal, conectar_malla_vertical
 

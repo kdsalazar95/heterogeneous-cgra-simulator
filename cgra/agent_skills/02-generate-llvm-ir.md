@@ -11,7 +11,7 @@ the initial memory of the CGRA, `memoria.bin`.
 
 ## Commands
 
-Run both from the program's folder, `src/<programa>/`:
+Run both from the program's folder, `compartido/<programa>/`:
 
 ```sh
 clang-18 -S -emit-llvm <programa>.c -o <programa>.ll
@@ -21,14 +21,14 @@ clang-18 <programa>.c -o <programa>.out && ./<programa>.out
 The first command produces the IR. The second compiles the source to a native
 executable and runs it: its `inicializar_memoria()` creates and initializes the
 arrays and saves them to `memoria.bin` in the current directory, with
-`guardar_memoria()` from `src/memoria_cgra.h`.
+`guardar_memoria()` from `compartido/memoria_cgra.h`.
 
 ## The Initial Memory
 
 Like the memory of a processor, `memoria.bin` is binary: a flat array of
 `float32` words preceded by a symbol table. Each symbol is one region (a bank):
 its name, its first word, and its shape in `filas x columnas`. Matrices are
-stored row by row. The exact layout is documented in `src/memoria_cgra.h`.
+stored row by row. The exact layout is documented in `compartido/memoria_cgra.h`.
 
 The region names are the bank names that the PE programs use in `LD`/`ST`
 (skill 08). They come from the `RegionMemoria` table at the end of
@@ -47,7 +47,7 @@ loads it (and saves the results back with `--write-back`).
 
 ## Actions
 
-1. Run the commands from `src/<programa>/`, unless the user specified another
+1. Run the commands from `compartido/<programa>/`, unless the user specified another
    output directory.
 2. Stop and report the compiler error if either compilation fails, or the
    program's error if it cannot write `memoria.bin`.
@@ -59,8 +59,8 @@ loads it (and saves the results back with `--write-back`).
 ## Outputs
 
 ```text
-src/<programa>/<programa>.ll
-src/<programa>/memoria.bin
+compartido/<programa>/<programa>.ll
+compartido/<programa>/memoria.bin
 ```
 
 ## Notes

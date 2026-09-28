@@ -7,7 +7,7 @@ and the generated graphs.
 
 ## Inputs
 
-- `src/<programa>/<programa>.ll`
+- `compartido/<programa>/<programa>.ll`
 - CFG dot graph
 - DDG dot graph
 - the size constants and the `memoria.bin` regions recorded in the manifest

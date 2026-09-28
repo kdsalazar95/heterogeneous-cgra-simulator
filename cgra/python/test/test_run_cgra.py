@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 _raiz_proyecto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_raiz_proyecto, "src"))
+sys.path.insert(0, _raiz_proyecto)
 
 from programas_pe import cargar_programas_pe, ejecutar_cgra, validar_programas
 from reportes_ciclos import contar_ciclos, formatear_estadisticas_ciclos, guardar_reporte_ciclos

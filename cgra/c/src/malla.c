@@ -1,5 +1,5 @@
 /*
- * Ejecución de la malla, como ejecutar_cgra() de src/programas_pe.py.
+ * Ejecución de la malla, como ejecutar_cgra() de python/programas_pe.py.
  *
  * En cada ciclo primero van todos los SEND y después el resto, ambas
  * pasadas en el orden de los PEs (fila por fila). El resto se reparte en

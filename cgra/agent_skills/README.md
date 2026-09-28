@@ -4,17 +4,17 @@ Use these skills in order to transform one of the supported C sources into
 per-PE instruction files for a `filas x columnas` processing-element mesh, plus
 the initial memory those programs run on (`memoria.bin`).
 
-The supported sources are `src/reduccion/reduccion.c`, `src/matmul/matmul.c`,
-and `src/convolucion/convolucion.c`. Their sizes come from the `#define`
+The supported sources are `compartido/reduccion/reduccion.c`, `compartido/matmul/matmul.c`,
+and `compartido/convolucion/convolucion.c`. Their sizes come from the `#define`
 constants of each source, the source to compile comes from the request, and the
-mesh size comes from the `FILAS` and `COLUMNAS` constants of `src/run_cgra.py`
+mesh size comes from the `FILAS` and `COLUMNAS` constants of `python/run_cgra.py`
 (see [Receive Inputs](01-receive-inputs.md)).
 
 The CGRA behaves like a processor: it is never told which operation it runs.
 The pipeline is the compiler. It turns the source into one program per PE
 (skill 08), and running the source once produces the initial memory:
 `inicializar_memoria()` in each `.c` fills the arrays and saves them to
-`src/<programa>/memoria.bin` (skill 02). `run_cgra.py` only loads those two
+`compartido/<programa>/memoria.bin` (skill 02). `run_cgra.py` only loads those two
 things and executes them.
 
 The mesh and the problem do not have to be the same size: a larger problem is

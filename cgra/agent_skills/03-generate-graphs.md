@@ -18,7 +18,7 @@ opt-18 -passes=dot-ddg <programa>.ll
 ## Actions
 
 1. Run both commands from the directory where graph outputs should appear
-   (`src/<programa>/`, so the graphs of each program stay apart).
+   (`compartido/<programa>/`, so the graphs of each program stay apart).
 2. Locate the generated CFG dot file. For `main`, this is commonly `.main.dot`.
 3. Locate the generated DDG dot file. For `main`, this is commonly
    `ddg.main..dot`.
@@ -27,8 +27,8 @@ opt-18 -passes=dot-ddg <programa>.ll
 ## Outputs
 
 ```text
-src/<programa>/.main.dot
-src/<programa>/ddg.main..dot
+compartido/<programa>/.main.dot
+compartido/<programa>/ddg.main..dot
 ```
 
 ## Notes

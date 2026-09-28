@@ -59,7 +59,7 @@ Without `--perfil`, the timers still run but nothing extra is printed.
 ## Results Folder
 
 ```text
-cgra_c/perfilado/
+c/perfilado/
 ├── entorno.txt                          laptop, OS, compiler, flags, commit
 ├── <programa>_<f>x<c>_<variante>.csv    raw samples, one per run
 ├── resumen.csv                          statistics
@@ -118,7 +118,7 @@ the file, so `uv run` installs them without touching the project environment:
   (the 15 fields plus `variante`).
 - The analysis script reports 120 samples per stage and writes `resumen.csv`
   and both plots.
-- Run these checks on a scratchpad copy of `cgra_c/` and leave `perfilado/`
+- Run these checks on a scratchpad copy of `c/` and leave `perfilado/`
   in the project empty: the real measurements are taken later by the user
   (`Guia_perfilado.md`), and skill 09 would count any leftover test file as
   one of them.
@@ -126,18 +126,18 @@ the file, so `uv run` installs them without touching the project environment:
 ## Outputs
 
 ```text
-cgra_c/include/perfil.h
-cgra_c/src/perfil.c
-cgra_c/scripts/perfilar.sh
-cgra_c/scripts/analizar_perfil.py
+c/include/perfil.h
+c/src/perfil.c
+c/scripts/perfilar.sh
+c/scripts/analizar_perfil.py
 ```
 
-Do not version `cgra_c/perfilado/`: each person profiles on their own laptop
+Do not version `c/perfilado/`: each person profiles on their own laptop
 and keeps their own results. Add it to the project `.gitignore`:
 
 ```gitignore
-**/cgra_c/perfilado/
+**/c/perfilado/
 ```
 
-Check it with `git check-ignore -v cgra_c/perfilado/resumen.csv`, which must
+Check it with `git check-ignore -v c/perfilado/resumen.csv`, which must
 name that rule.

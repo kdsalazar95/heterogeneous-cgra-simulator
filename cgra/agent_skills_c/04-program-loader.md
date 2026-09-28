@@ -4,7 +4,7 @@
 
 Read the `PE{fila}{columna}.txt` files of a `filas x columnas` mesh into a
 compact, pre-resolved representation, and validate them exactly like
-`validar_programas()` of `src/programas_pe.py`.
+`validar_programas()` of `python/programas_pe.py`.
 
 ## PE Identifiers
 
@@ -86,7 +86,7 @@ Ciclo <n>: <receptor> RECV <dir> no coincide con <emisor> SEND <opuesta>
   the cycle count: 828 for `matmul` 4x4, 1458 for `convolucion` 4x4, 42 for
   `reduccion` 8x8 (or whatever the Python reference prints for the current
   files).
-- Load `src/reduccion/pe_instructions` as 4x4 and check that it fails because
+- Load `compartido/reduccion/pe_instructions` as 4x4 and check that it fails because
   `PE03` has no neighbor to the east, like the Python version.
 - In a scratchpad copy of a program, change one `RECV` to `NOP` and check that
   validation reports it.
@@ -94,6 +94,6 @@ Ciclo <n>: <receptor> RECV <dir> no coincide con <emisor> SEND <opuesta>
 ## Outputs
 
 ```text
-cgra_c/include/programa.h
-cgra_c/src/programa.c
+c/include/programa.h
+c/src/programa.c
 ```

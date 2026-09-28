@@ -4,7 +4,7 @@ La CGRA funciona como un procesador: no se le dice qué operación va a
 correr. Recibe la carpeta de un programa ya compilado por los skills y
 ejecuta lo que encuentra ahí:
 
-    src/<programa>/
+    compartido/<programa>/
     ├── pe_instructions/PE{fila}{columna}.txt   un programa por PE (skill 08)
     └── memoria.bin                             memoria inicial, la genera el .c (skill 02)
 """
@@ -65,7 +65,7 @@ def ejecutar_y_mostrar(argumentos):
 def main():
     parser = argparse.ArgumentParser(description="Ejecuta un programa en una CGRA de tamaño NxM.")
     parser.add_argument(
-        "programa", help="Carpeta del programa, con pe_instructions/ y memoria.bin (ej. src/matmul)",
+        "programa", help="Carpeta del programa, con pe_instructions/ y memoria.bin (ej. compartido/matmul)",
     )
     parser.add_argument(
         "--instrucciones", metavar="DIR", help="Usa estos PE*.txt en vez de <programa>/pe_instructions",

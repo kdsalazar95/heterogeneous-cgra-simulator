@@ -3,9 +3,9 @@
 #
 #   perfilar.sh <variante> <binario> <programa> <filas> <columnas> [muestras=120]
 #
-# Ejemplo, desde cgra_c/:
+# Ejemplo, desde c/:
 #   make OPT=-O0 BUILD=build/O0
-#   OPT=-O0 scripts/perfilar.sh O0 build/O0/cgra ../src/matmul 4 4
+#   OPT=-O0 scripts/perfilar.sh O0 build/O0/cgra ../compartido/matmul 4 4
 #
 # Escribe perfilado/<programa>_<f>x<c>_<variante>.csv (una fila por corrida,
 # la cabecera primero; volver a correrlo reemplaza el archivo) y

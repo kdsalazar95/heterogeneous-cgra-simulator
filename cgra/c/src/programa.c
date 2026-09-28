@@ -1,6 +1,6 @@
 /*
  * Lectura y validación de los PE{fila}{columna}.txt, como
- * cargar_programas_pe() y validar_programas() de src/programas_pe.py.
+ * cargar_programas_pe() y validar_programas() de python/programas_pe.py.
  *
  * Todo lo que se puede resolver al cargar (registros, bancos, índices,
  * direcciones) se resuelve aquí, para que el ciclo de ejecución nunca

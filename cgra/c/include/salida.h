@@ -1,7 +1,7 @@
 /*
- * Presentación: números, títulos y cajas (src/formato_texto.py), las
- * regiones que cambiaron (src/resultados.py) y el reporte de ciclos
- * (src/reportes_ciclos.py).
+ * Presentación: números, títulos y cajas (python/formato_texto.py), las
+ * regiones que cambiaron (python/resultados.py) y el reporte de ciclos
+ * (python/reportes_ciclos.py).
  */
 
 #ifndef SALIDA_H

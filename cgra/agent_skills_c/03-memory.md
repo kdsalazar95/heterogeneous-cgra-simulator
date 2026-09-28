@@ -3,7 +3,7 @@
 ## Purpose
 
 Load `memoria.bin` into a flat memory with its symbol table, and write it back,
-in the format defined by `src/memoria_cgra.h` (the same file the `.c` programs
+in the format defined by `compartido/memoria_cgra.h` (the same file the `.c` programs
 use to create it).
 
 ## Format
@@ -57,7 +57,7 @@ work on.
 1. Read the whole file, check the firma, and check that its size is exactly
    `16 + cantidad * 28 + 4 * palabras` bytes.
 2. Check that every region fits: `direccion + filas * columnas <= palabras`.
-3. Name the error the same way as `src/memoria_binaria.py` (wrong firma, wrong
+3. Name the error the same way as `python/memoria_binaria.py` (wrong firma, wrong
    size, region out of memory), print it to `stderr` with the file path, and
    return -1.
 4. `guardar_memoria_cgra` writes header, symbol table and data in one pass.
@@ -67,7 +67,7 @@ work on.
 
 ## Checks
 
-- Load each `src/<programa>/memoria.bin` and print its regions: names, shapes
+- Load each `compartido/<programa>/memoria.bin` and print its regions: names, shapes
   and word count must match what `cargar_memoria()` of `memoria_binaria.py`
   returns.
 - Load and save to the scratchpad, then compare with `cmp`: the files must be
@@ -76,6 +76,6 @@ work on.
 ## Outputs
 
 ```text
-cgra_c/include/memoria.h
-cgra_c/src/memoria.c
+c/include/memoria.h
+c/src/memoria.c
 ```

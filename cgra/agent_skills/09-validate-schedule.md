@@ -23,8 +23,8 @@ respect mesh communication.
 10. The final reduction result is stored by `PE00`, unless the user requested a
     different output PE.
 11. Every `LD`/`ST` names a region of `memoria.bin` and stays inside its size.
-    Read the regions from its symbol table (layout in `src/memoria_cgra.h`), or
-    load it with `cargar_memoria()` of `src/memoria_binaria.py`.
+    Read the regions from its symbol table (layout in `compartido/memoria_cgra.h`), or
+    load it with `cargar_memoria()` of `python/memoria_binaria.py`.
 
 ## Per Operation
 

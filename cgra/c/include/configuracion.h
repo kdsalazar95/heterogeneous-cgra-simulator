@@ -8,8 +8,8 @@
 #ifndef CONFIGURACION_H
 #define CONFIGURACION_H
 
-#define FILAS_POR_DEFECTO 4     // keep equal to FILAS in src/run_cgra.py
-#define COLUMNAS_POR_DEFECTO 4  // keep equal to COLUMNAS in src/run_cgra.py
+#define FILAS_POR_DEFECTO 4     // keep equal to FILAS in python/run_cgra.py
+#define COLUMNAS_POR_DEFECTO 4  // keep equal to COLUMNAS in python/run_cgra.py
 #define NUM_REGISTROS 16
 #define CAPACIDAD_COLA 16
 

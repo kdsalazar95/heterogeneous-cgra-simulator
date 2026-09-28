@@ -3,8 +3,8 @@
 ## Purpose
 
 Execute the validated programs cycle by cycle on the mesh, with the semantics
-of `ejecutar_cgra()` (`src/programas_pe.py`) and `PE.execute()`
-(`src/pe_malla.py`).
+of `ejecutar_cgra()` (`python/programas_pe.py`) and `PE.execute()`
+(`python/pe_malla.py`).
 
 ## Data Structures (`include/malla.h`)
 
@@ -84,6 +84,6 @@ disable this output: skill 07 turns it off while profiling.
 ## Outputs
 
 ```text
-cgra_c/include/malla.h
-cgra_c/src/malla.c
+c/include/malla.h
+c/src/malla.c
 ```

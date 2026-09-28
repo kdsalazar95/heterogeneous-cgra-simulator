@@ -70,7 +70,7 @@ Datos de `perfilado/entorno.txt`:
 | Sistema operativo | Linux 7.0.0-31-generic (Ubuntu), x86_64 |
 | Compilador | gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0 |
 | Gobernador | `performance` |
-| Commit | `416b9c6` (el código de `cgra_c/` aún no estaba confirmado en ese commit) |
+| Commit | `416b9c6` (el código de `c/` aún no estaba confirmado en ese commit) |
 
 ## 3. Resultados
 
@@ -185,7 +185,7 @@ cada cambio.
 
 ## 6. Reproducibilidad
 
-Desde `cgra_c/`:
+Desde `c/`:
 
 ```sh
 # Variantes
@@ -198,9 +198,9 @@ sudo cpupower frequency-set -g performance
 
 # Muestras: 5 de calentamiento + 120 por configuración
 for v in O0 O2 O3; do
-    OPT=-$v CC=gcc scripts/perfilar.sh $v build/$v/cgra ../src/reduccion 8 8 120
-    OPT=-$v CC=gcc scripts/perfilar.sh $v build/$v/cgra ../src/matmul 4 4 120
-    OPT=-$v CC=gcc scripts/perfilar.sh $v build/$v/cgra ../src/convolucion 4 4 120
+    OPT=-$v CC=gcc scripts/perfilar.sh $v build/$v/cgra ../compartido/reduccion 8 8 120
+    OPT=-$v CC=gcc scripts/perfilar.sh $v build/$v/cgra ../compartido/matmul 4 4 120
+    OPT=-$v CC=gcc scripts/perfilar.sh $v build/$v/cgra ../compartido/convolucion 4 4 120
 done
 
 # Estadísticas, resumen.csv y gráficas
@@ -209,7 +209,7 @@ uv run scripts/analizar_perfil.py
 # Funciones calientes (instrucciones por función)
 make OPT="-O2 -g" BUILD=build/O2g
 valgrind --tool=callgrind --callgrind-out-file=/tmp/matmul.cg \
-    build/O2g/cgra ../src/matmul --reporte-ciclos /tmp/r.txt --perfil 1
+    build/O2g/cgra ../compartido/matmul --reporte-ciclos /tmp/r.txt --perfil 1
 callgrind_annotate --inclusive=no /tmp/matmul.cg > perfilado/funciones_matmul_O2.txt
 ```
 

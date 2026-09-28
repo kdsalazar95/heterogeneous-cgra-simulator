@@ -5,7 +5,7 @@ check (✔) o una X según haya pasado o fallado, y usando la explicación
 en español de cada prueba en vez de solo su nombre técnico.
 
 Cómo correrlo:
-    uv run python3 test/run_tests.py
+    uv run python3 python/test/run_tests.py
 """
 import io
 import os
@@ -13,7 +13,7 @@ import sys
 import unittest
 
 _raiz_proyecto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_raiz_proyecto, "src"))
+sys.path.insert(0, _raiz_proyecto)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import test_pe_malla  # el archivo de pruebas normal, sin tocarlo

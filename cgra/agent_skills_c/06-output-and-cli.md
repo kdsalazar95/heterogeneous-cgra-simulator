@@ -3,7 +3,7 @@
 ## Purpose
 
 Show the results, write the cycle report, and offer the same command line as
-`src/run_cgra.py`.
+`python/run_cgra.py`.
 
 ## Command Line
 
@@ -13,7 +13,7 @@ cgra <programa> [--filas N] [--columnas M] [--memoria RUTA] [--instrucciones DIR
 ```
 
 - `<programa>`: folder with `pe_instructions/` and `memoria.bin`. Drop a
-  trailing `/` so it prints like Python's `Path` (`src/matmul`).
+  trailing `/` so it prints like Python's `Path` (`compartido/matmul`).
 - Defaults: `--filas`/`--columnas` from `configuracion.h`, memory
   `<programa>/memoria.bin`, instructions `<programa>/pe_instructions`, report
   `<programa>/reporte_ciclos.txt`.
@@ -37,7 +37,7 @@ Keep these steps as separate functions: skill 07 times each one.
 
 ## Results
 
-Same rules as `src/resultados.py`, from the memory only:
+Same rules as `python/resultados.py`, from the memory only:
 
 - Show every region whose values differ from the initial copy, in file order.
 - 1x1: title `RESULTADO: <nombre>` and a box with `<nombre> = <valor>`.
@@ -58,7 +58,7 @@ It must be **byte-identical** to the one written by `reportes_ciclos.py`:
 CICLOS: cómputo vs comunicación
 
 Malla de la CGRA:       4x4 (16 PEs)
-Programa:               src/matmul
+Programa:               compartido/matmul
 Memoria:                a (9x9), b (9x9), result (9x9)
 
 Total de ciclos:        828
@@ -81,7 +81,7 @@ Pasos de comunicación entre PEs:
 ## Outputs
 
 ```text
-cgra_c/include/salida.h
-cgra_c/src/salida.c
-cgra_c/src/main.c
+c/include/salida.h
+c/src/salida.c
+c/src/main.c
 ```

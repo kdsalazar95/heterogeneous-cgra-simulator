@@ -7,7 +7,7 @@ laptop.
 
 ## Run Once
 
-These skills are run **once**, to create `cgra_c/`. The result is ordinary
+These skills are run **once**, to create `c/`. The result is ordinary
 source code that is committed to the repository; from then on, anyone who
 wants to profile pulls the repository, builds with `make`, and follows
 `Guia_perfilado.md`, without running these skills again. The `PE*.txt` and
@@ -15,12 +15,12 @@ wants to profile pulls the repository, builds with `make`, and follows
 generates them with [agent_skills/](../agent_skills/README.md), which can be
 run as often as needed.
 
-If `cgra_c/` already exists, stop and do not rewrite it: a new port would be
+If `c/` already exists, stop and do not rewrite it: a new port would be
 different code, it would replace the committed one, and measurements taken
 with each would not be comparable. Change it only when the user explicitly
 asks to redo the port or to modify the simulator.
 
-This pipeline only covers the **simulator** (what `src/run_cgra.py` does today).
+This pipeline only covers the **simulator** (what `python/run_cgra.py` does today).
 The compiler, which turns a `.c` source into `PE*.txt` files and `memoria.bin`,
 stays in [agent_skills/](../agent_skills/README.md) and is not ported here.
 
@@ -31,14 +31,14 @@ version must reproduce its behavior, and skill 08 compares both.
 
 | Python module | What it does | C skill |
 |---|---|---|
-| `src/memoria_binaria.py` | load and save `memoria.bin` | [03](03-memory.md) |
-| `src/programas_pe.py` (loader, IDs, validation) | parse and validate `PE*.txt` | [04](04-program-loader.md) |
-| `src/pe_malla.py`, `ejecutar_cgra()` | registers, FIFO queues, cycle loop | [05](05-mesh-execution.md) |
-| `src/resultados.py`, `src/reportes_ciclos.py`, `src/run_cgra.py` | output, report, command line | [06](06-output-and-cli.md) |
+| `python/memoria_binaria.py` | load and save `memoria.bin` | [03](03-memory.md) |
+| `python/programas_pe.py` (loader, IDs, validation) | parse and validate `PE*.txt` | [04](04-program-loader.md) |
+| `python/pe_malla.py`, `ejecutar_cgra()` | registers, FIFO queues, cycle loop | [05](05-mesh-execution.md) |
+| `python/resultados.py`, `python/reportes_ciclos.py`, `python/run_cgra.py` | output, report, command line | [06](06-output-and-cli.md) |
 | (new) | profiling tools (timers and scripts) | [07](07-profiling.md) |
 | (new) | profiling report, optional and separate | [09](09-profiling-report.md) |
 
-The binary memory format is defined in `src/memoria_cgra.h`, which the C
+The binary memory format is defined in `compartido/memoria_cgra.h`, which the C
 simulator includes as is.
 
 ## Ground Rules
@@ -69,7 +69,7 @@ simulator includes as is.
 7. [Profiling Instrumentation](07-profiling.md)
 8. [Verify Equivalence](08-verify-equivalence.md)
 
-After skill 08, `cgra_c/` is ready to commit (without `build/`, which git
+After skill 08, `c/` is ready to commit (without `build/`, which git
 ignores). The profiling itself is not part of this pipeline: each person does
 it on their own laptop with `Guia_perfilado.md`.
 
@@ -79,7 +79,7 @@ from the results of a profiling run, when someone asks for it.
 ## Target Layout
 
 ```text
-cgra_c/
+c/
 ├── Makefile
 ├── include/
 │   ├── configuracion.h   default mesh, limits

@@ -1,7 +1,7 @@
 CC       ?= gcc
 OPT      ?= -O2
 CFLAGS   ?= -std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L
-CPPFLAGS += -Iinclude -I../src          # ../src holds memoria_cgra.h
+CPPFLAGS += -Iinclude -I../compartido          # ../compartido holds memoria_cgra.h
 BUILD    ?= build
 
 FUENTES  := $(wildcard src/*.c)

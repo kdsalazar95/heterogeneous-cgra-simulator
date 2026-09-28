@@ -9,7 +9,7 @@ import unittest
 from contextlib import redirect_stdout
 
 _raiz_proyecto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_raiz_proyecto, "src"))
+sys.path.insert(0, _raiz_proyecto)
 
 from memoria_binaria import cargar_memoria, escribir_memoria
 from resultados import mostrar_resultados, regiones_modificadas
