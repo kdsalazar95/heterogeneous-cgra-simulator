@@ -1,5 +1,5 @@
 # Computación Heterogénea 2026 — Grupo 1
-
+# Emulador de CGRA Heterogenea 
 ## Profesor
 
 | Rol | Nombre |
