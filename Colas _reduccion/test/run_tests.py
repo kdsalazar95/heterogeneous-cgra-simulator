@@ -1,5 +1,5 @@
 """
-Corre las pruebas de test_queue_pe.py, pero muestra los resultados de
+Corre las pruebas de test_pe_malla.py, pero muestra los resultados de
 forma más fácil de leer: agrupados por sección, uno por línea, con un
 check (✔) o una X según haya pasado o fallado, y usando la explicación
 en español de cada prueba en vez de solo su nombre técnico.
@@ -16,8 +16,9 @@ _raiz_proyecto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_raiz_proyecto, "src"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import test_queue_pe  # el archivo de pruebas normal, sin tocarlo
+import test_pe_malla  # el archivo de pruebas normal, sin tocarlo
 import test_run_cgra
+import test_resultados
 
 
 # Nombres de sección más amigables para cada clase de prueba.
@@ -26,6 +27,9 @@ NOMBRES_DE_SECCION = {
     "TestConectarMallaVertical": "Conexión vertical (norte \u2194 sur)",
     "TestComunicacionBidireccional": "Comunicación entre dos PEs (ida y vuelta)",
     "TestEjecucionCGRA": "Ejecución de programas de la CGRA",
+    "TestEstadisticasCiclos": "Ciclos de cómputo vs comunicación",
+    "TestMemoriaBinaria": "Memoria binaria de la CGRA (memoria.bin)",
+    "TestPresentacionResultado": "Presentación del resultado desde la memoria",
 }
 
 
@@ -87,10 +91,13 @@ def main():
     # horizontal, luego vertical, luego comunicación bidireccional),
     # en vez del orden alfabético por defecto de unittest.
     orden_de_clases = [
-        test_queue_pe.TestConectarMallaHorizontal,
-        test_queue_pe.TestConectarMallaVertical,
-        test_queue_pe.TestComunicacionBidireccional,
+        test_pe_malla.TestConectarMallaHorizontal,
+        test_pe_malla.TestConectarMallaVertical,
+        test_pe_malla.TestComunicacionBidireccional,
         test_run_cgra.TestEjecucionCGRA,
+        test_run_cgra.TestEstadisticasCiclos,
+        test_resultados.TestMemoriaBinaria,
+        test_resultados.TestPresentacionResultado,
     ]
     suite = unittest.TestSuite()
     for clase in orden_de_clases:

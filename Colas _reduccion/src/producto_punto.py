@@ -26,7 +26,7 @@
 # ============================================================
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from queue_pe import crear_malla, conectar_malla
+from pe_malla import crear_malla, conectar_malla
 
 
 # Traduce el nombre de la operación (lo que escribe el usuario)

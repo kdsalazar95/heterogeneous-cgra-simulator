@@ -1,13 +1,12 @@
-"""Lógica para cargar, validar y ejecutar una reducción sobre una CGRA 2x2."""
+"""Lógica para cargar, validar y ejecutar programas sobre una CGRA de tamaño filas x columnas."""
 
-import json
 import re
 from pathlib import Path
 
-from queue_pe import PE, crear_malla, conectar_malla
+from formato_texto import fmt, formato_pe, imprimir_titulo
+from pe_malla import PE, crear_malla, conectar_malla
 
 
-PE_IDS = ("PE00", "PE01", "PE10", "PE11")
 DIRECCIONES_OPUESTAS = {"north": "south", "south": "north", "east": "west", "west": "east"}
 DESPLAZAMIENTOS = {"north": (-1, 0), "south": (1, 0), "west": (0, -1), "east": (0, 1)}
 DIRECCIONES_EN_ESPANOL = {"north": "norte", "south": "sur", "west": "oeste", "east": "este"}
@@ -24,44 +23,9 @@ PATRON_MEMORIA = re.compile(r"^([A-Za-z_]\w*)\[(\d+)\]$")
 #
 # Ejemplo: a[0], b[5]
 
-#===================================================================================
-Funciones de utilidad para dar formato a números, imprimir títulos y cajas de texto
-
-
-# ============================= Inicio =============================================
-
-def fmt(numero):
-    """Da formato compacto a enteros y flotantes, como en ``reduccion.py``."""
-    return f"{round(numero, 6):g}" if isinstance(numero, (int, float)) else str(numero)
-
-
-def imprimir_titulo(texto):
-    """Imprime un título con el mismo estilo visual que ``reduccion.py``."""
-    ancho = len(texto) + 2
-    print()
-    print("┌" + "─" * ancho + "┐")
-    print(f"│ {texto} │")
-    print("└" + "─" * ancho + "┘")
-
-
-def caja(lineas):
-    """Imprime un resultado en una caja de texto."""
-    ancho = max(len(linea) for linea in lineas) + 2
-    print("┌" + "─" * ancho + "┐")
-    for linea in lineas:
-        print(f"│ {linea.ljust(ancho - 1)}│")
-    print("└" + "─" * ancho + "┘")
-
-
-def formatear_lista(valores):
-    return "[" + ", ".join(fmt(valor) for valor in valores) + "]"
-
-
-def formato_pe(pe_id):
-    """Convierte ``PE01`` al formato visual ``PE(0,1)``."""
-    return f"PE({pe_id[2]},{pe_id[3]})"
-
-#============================= Fin ==========================================
+# Las funciones de utilidad para dar formato a números, imprimir títulos y
+# cajas de texto (fmt, imprimir_titulo, caja, formatear_lista, formato_pe)
+# viven en formato_texto.py.
 
 #================== Lectura de instrucciones .txt ===========================
 def numero(texto):
@@ -81,7 +45,7 @@ def operando_memoria(texto, ruta, ciclo):
         raise ValueError(f"{ruta}, ciclo {ciclo}: memoria inválida '{texto}'")
     return coincidencia.group(1), int(coincidencia.group(2)) # separa a[3] en ("a", 3)
 
-# La funcion interpreta una direccion de memoria (identifica que banco de memoria y que posicion 
+# La funcion interpreta una direccion de memoria (identifica que banco de memoria y que posicion
 #se estan utilizando)
 
 # a[0]                 a: banco,  3: indice
@@ -144,26 +108,62 @@ def cargar_programa_pe(ruta):
 
 # Carga y convierte el contenido de un archivo PExx.txt en un programa que la cgra puede ejecutar
 
-def cargar_programas_pe(directorio):
-    """Carga y valida PE00.txt, PE01.txt, PE10.txt y PE11.txt."""
+def cargar_programas_pe(directorio, filas, columnas):
+    """Carga y valida los PE{fila}{columna}.txt de una malla filas x columnas."""
     directorio = Path(directorio)
     programas = {}
-    for pe_id in PE_IDS: 
+    for pe_id in generar_pe_ids(filas, columnas):
         ruta = directorio / f"{pe_id}.txt"
         if not ruta.is_file():
             raise FileNotFoundError(f"No existe {ruta}")
         programas[pe_id] = cargar_programa_pe(ruta)
-    validar_programas(programas)
+    validar_programas(programas, filas, columnas)
     return programas
 
-# Esta funcion trabaja con lo 4 PEs
-# carga los cuatro archivos .txt que representan los programas de los PEs y los valida antes de ejecutar la CGRA.
+# Esta funcion trabaja con todos los PEs de la malla (filas x columnas):
+# carga los .txt que representan los programas de los PEs y los valida antes de ejecutar la CGRA.
 
-def vecino(pe_id, direccion):
+#================== Identificadores de PE ===================================
+
+def ancho_id_pe(filas, columnas):
+    """Cuántos dígitos ocupa cada coordenada en un ID de PE, según el
+    índice más grande que puede aparecer en la malla.
+
+    Con filas y columnas <= 10 da 1 (PE00, PE77, ...), igual que antes;
+    con mallas más grandes (ej. 12x12) da 2 (PE0100 para fila=1,
+    columna=0), para que un índice de dos dígitos no se confunda con
+    dos índices de un dígito.
+    """
+    return len(str(max(filas, columnas) - 1))
+
+
+def descomponer_pe_id(pe_id):
+    """Separa un ID como ``PE0100`` en ``(fila, columna) = (1, 0)``.
+
+    Ambas coordenadas ocupan el mismo ancho dentro del ID (ver
+    ``generar_pe_ids``), así que alcanza con partir el número al medio.
+    """
+    numeros = pe_id[2:]
+    ancho = len(numeros) // 2
+    return int(numeros[:ancho]), int(numeros[ancho:])
+
+
+def generar_pe_ids(filas, columnas):
+    """Genera los identificadores PE de una malla de tamaño filas x columnas.
+
+    Coincide con el nombre de archivo de cada PE (PE00.txt, PE01.txt, ...).
+    Por ejemplo, con filas=2 y columnas=2 devuelve
+    ("PE00", "PE01", "PE10", "PE11"), igual que antes.
+    """
+    ancho = ancho_id_pe(filas, columnas)
+    return tuple(f"PE{f:0{ancho}d}{c:0{ancho}d}" for f in range(filas) for c in range(columnas))
+
+
+def vecino(pe_id, direccion, filas, columnas):
     """Obtiene el PE vecino de un PE dado según la dirección indicada."""
-    
+
     # Obtiene la fila y columna del PE
-    fila, columna = int(pe_id[2]), int(pe_id[3])
+    fila, columna = descomponer_pe_id(pe_id)
 
     # Obtiene el desplazamiento correspondiente a la dirección
     delta_fila, delta_columna = DESPLAZAMIENTOS.get(direccion, (None, None))
@@ -173,17 +173,18 @@ def vecino(pe_id, direccion):
         raise ValueError(f"Dirección inválida: {direccion}")
 
     # Calcula la posición del PE vecino
-    destino = fila + delta_fila, columna + delta_columna
+    destino_fila, destino_columna = fila + delta_fila, columna + delta_columna
 
-    # Verifica que el vecino esté dentro de la malla 2x2
-    if not all(0 <= valor < 2 for valor in destino):
+    # Verifica que el vecino esté dentro de la malla filas x columnas
+    if not (0 <= destino_fila < filas and 0 <= destino_columna < columnas):
         raise ValueError(f"{pe_id}: no tiene vecino hacia {direccion}")
 
-    # Devuelve el identificador del PE vecino
-    return f"PE{destino[0]}{destino[1]}"
+    # Devuelve el identificador del PE vecino, con el mismo ancho que los demás IDs
+    ancho = ancho_id_pe(filas, columnas)
+    return f"PE{destino_fila:0{ancho}d}{destino_columna:0{ancho}d}"
 
 
-def validar_programas(programas):
+def validar_programas(programas, filas, columnas):
     """Aplica las comprobaciones estructurales relevantes del skill 09."""
     ciclos = set(next(iter(programas.values())))
     if ciclos != set(range(max(ciclos) + 1)):
@@ -196,14 +197,14 @@ def validar_programas(programas):
         for emisor, programa in programas.items():
             instruccion = programa[ciclo]
             if instruccion["op"] == "send":
-                receptor = vecino(emisor, instruccion["dir"])
+                receptor = vecino(emisor, instruccion["dir"], filas, columnas)
                 esperada = DIRECCIONES_OPUESTAS[instruccion["dir"]]
                 recibida = programas[receptor][ciclo]
                 if recibida["op"] != "recv" or recibida["dir"] != esperada:
                     raise ValueError(f"Ciclo {ciclo}: {emisor} SEND {instruccion['dir']} no coincide con {receptor} RECV {esperada}")
             elif instruccion["op"] == "recv":
                 receptor = emisor
-                emisor = vecino(receptor, instruccion["dir"])
+                emisor = vecino(receptor, instruccion["dir"], filas, columnas)
                 esperada = DIRECCIONES_OPUESTAS[instruccion["dir"]]
                 enviada = programas[emisor][ciclo]
                 if enviada["op"] != "send" or enviada["dir"] != esperada:
@@ -216,36 +217,43 @@ def validar_programas(programas):
 # 3. Los SEND y RECV coinciden correctamente
 #               ↓
 #         Programa válido
- 
-def ejecutar_cgra(memoria, programas, mostrar_pasos=False):
+
+def ejecutar_cgra(memoria, programas, filas, columnas, mostrar_pasos=False):
     """Ejecuta una instrucción por PE y por ciclo; SEND se procesa primero.
 
     Si ``mostrar_pasos`` es verdadero, imprime cada comunicación de la
     reducción cuando su ADD receptor ya se ejecutó en el ciclo siguiente.
     """
-    malla = crear_malla(2, 2)
+    malla = crear_malla(filas, columnas)
     conectar_malla(malla)
-    pes = {"PE00": malla[0][0], "PE01": malla[0][1], "PE10": malla[1][0], "PE11": malla[1][1]}
+    pe_ids = generar_pe_ids(filas, columnas)
+    pes = {}
+    for pe_id in pe_ids:
+        fila, columna = descomponer_pe_id(pe_id)
+        pes[pe_id] = malla[fila][columna]
 
     pasos_pendientes = []
     numero_paso = 1
     for ciclo in sorted(next(iter(programas.values()))):
-        for pe_id in PE_IDS:
-            instruccion = programas[pe_id][ciclo]
-            if instruccion["op"] == "send":
-                if mostrar_pasos and instruccion["src"] == "acc":
-                    receptor = vecino(pe_id, instruccion["dir"])
-                    pasos_pendientes.append({
-                        "ciclo_resultado": ciclo + 1,
-                        "emisor": pe_id,
-                        "receptor": receptor,
-                        "direccion": instruccion["dir"],
-                        "antes": pes[receptor]._register[PE.REGISTROS["acc"]],
-                        "enviado": pes[pe_id]._register[PE.REGISTROS["acc"]],
-                    })
-                pes[pe_id].execute(instruccion, memoria)
-        for pe_id in PE_IDS:
-            instruccion = programas[pe_id][ciclo]
+        instrucciones_del_ciclo = {pe_id: programas[pe_id][ciclo] for pe_id in pe_ids}
+
+        # Primero todos los SEND, para que el RECV del vecino encuentre el
+        # dato en la cola dentro del mismo ciclo.
+        for pe_id, instruccion in instrucciones_del_ciclo.items():
+            if instruccion["op"] != "send":
+                continue
+            if mostrar_pasos and instruccion["src"] == "acc":
+                receptor = vecino(pe_id, instruccion["dir"], filas, columnas)
+                pasos_pendientes.append({
+                    "ciclo_resultado": ciclo + 1,
+                    "emisor": pe_id,
+                    "receptor": receptor,
+                    "direccion": instruccion["dir"],
+                    "antes": pes[receptor]._register[PE.REGISTROS["acc"]],
+                    "enviado": pes[pe_id]._register[PE.REGISTROS["acc"]],
+                })
+            pes[pe_id].execute(instruccion, memoria)
+        for pe_id, instruccion in instrucciones_del_ciclo.items():
             if instruccion["op"] != "send":
                 pes[pe_id].execute(instruccion, memoria)
 
@@ -261,7 +269,7 @@ def ejecutar_cgra(memoria, programas, mostrar_pasos=False):
     return malla
 
 # Flujo de la funcion:
-# Crear malla 2×2
+# Crear malla filas x columnas
 #        ↓
 # Conectar PEs
 #        ↓
@@ -280,31 +288,3 @@ def ejecutar_cgra(memoria, programas, mostrar_pasos=False):
 #      ...
 #       ↓
 # Devolver CGRA ejecutada
-
-def cargar_memoria(ruta):
-    """Carga y valida la memoria desde un archivo JSON."""
-    memoria = json.loads(Path(ruta).read_text(encoding="utf-8"))
-    if not isinstance(memoria, dict) or not all(isinstance(valores, list) for valores in memoria.values()):
-        raise ValueError("La memoria debe ser un objeto JSON de bancos representados por listas")
-    return memoria
-
-#============================= Resultados de la CGRA =========================================
-
-# Esta funcion toma la informacion de memoria y la presenta de forma ordenada en la pantalla
-
-def mostrar_resultados(memoria, ciclos):
-    """Muestra la salida de la simulación con el estilo de ``reduccion.py``."""
-    imprimir_titulo(f"CGRA 2x2: ejecutando {ciclos} ciclos")
-    print("  Programas por PE cargados y validados correctamente.")
-
-    lineas = []
-    if "c" in memoria:
-        lineas.append(f"c = {formatear_lista(memoria['c'])}")
-    banco_resultado = "result" if "result" in memoria else "resultado" if "resultado" in memoria else None
-    if banco_resultado and memoria[banco_resultado]:
-        lineas.append(f"RESULTADO FINAL: {fmt(memoria[banco_resultado][0])}")
-    if not lineas:
-        lineas.append("Ejecución terminada.")
-
-    imprimir_titulo("RESULTADO DE LA CGRA")
-    caja(lineas)

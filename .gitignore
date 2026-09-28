@@ -8,3 +8,19 @@ historial_busqueda_dijkstra.csv
 historial_entrenamiento.csv
 progreso_entrenamiento.png
 .pytest_cache/
+
+# Todo lo que generan los skills y run_cgra.py: IR, graficas, horarios de los
+# PEs, memorias y reportes. En el repositorio solo queda el codigo fuente
+# (.py, .c) y la documentacion (.md).
+*.ll
+*.dot
+*.json
+*.bin
+*.out
+*.txt
+pe_instructions/
+graphs/
+**/programas/*
+
+# Excepcion: el horario de referencia 2x2 que usan las pruebas
+!**/test/datos/**
