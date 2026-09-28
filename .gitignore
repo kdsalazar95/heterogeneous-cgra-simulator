@@ -24,3 +24,9 @@ graphs/
 
 # Excepcion: el horario de referencia 2x2 que usan las pruebas
 !**/test/datos/**
+
+# Simulador en C: los binarios se generan con make
+**/cgra_c/build/
+
+# Resultados del perfilado: cada persona mide en su laptop (Guia_perfilado.md)
+**/cgra_c/perfilado/

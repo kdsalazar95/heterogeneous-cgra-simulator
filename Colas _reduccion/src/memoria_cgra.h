@@ -39,14 +39,14 @@ typedef struct {
     uint32_t columnas;
 } RegionMemoria;
 
-static void escribir(FILE *archivo, const void *datos, size_t tamano, size_t cantidad) {
+static inline void escribir(FILE *archivo, const void *datos, size_t tamano, size_t cantidad) {
     if (fwrite(datos, tamano, cantidad, archivo) != cantidad) {
         perror(ARCHIVO_MEMORIA);
         exit(1);
     }
 }
 
-static void guardar_memoria(const char *ruta, const RegionMemoria *regiones, uint32_t cantidad) {
+static inline void guardar_memoria(const char *ruta, const RegionMemoria *regiones, uint32_t cantidad) {
     FILE *archivo = fopen(ruta, "wb");
     if (!archivo) {
         perror(ruta);
