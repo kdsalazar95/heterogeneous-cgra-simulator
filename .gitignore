@@ -32,3 +32,7 @@ graphs/
 # C simulator artifacts
 cgra/c/build/
 cgra/c/perfilado/
+
+# Simulador en Python: solo local, el repo usa la versión en C
+cgra/src/*.py
+cgra/test/
