@@ -28,3 +28,7 @@ graphs/
 !**/test/datos/**
 # ...pero los .txt de test/datos no se suben
 **/test/datos/**/*.txt
+
+# C simulator artifacts
+cgra/c/build/
+cgra/c/perfilado/
