@@ -33,6 +33,7 @@ typedef struct {
     uint32_t filas, columnas;
     uint32_t palabras_memoria;
     uint32_t ancho_vector;       // 0: la CGRA no tiene registros vectoriales
+    uint32_t palabras_locales;   // memoria local de cada PE; 0: no hay (LDL/STL)
     TipoPE *tipos;
     uint32_t cantidad_tipos;
     uint32_t *mapa;              // [fila * columnas + columna]: índice en tipos

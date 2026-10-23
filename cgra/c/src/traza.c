@@ -49,6 +49,15 @@ int anotar_efecto(Traza *traza, uint32_t ciclo, uint32_t pe, const Instruccion *
         agregar_numeros(&texto, memoria->datos + inst->direccion, estado.ancho, ", ", 1);
         agregar_texto(&texto, "  (dirección %zu)", inst->direccion);
         break;
+    case OP_STL:
+        formatear_numero(numero, estado.local[inst->indice]);
+        agregar_texto(&texto, "local[%llu] = %s", (unsigned long long)inst->indice, numero);
+        break;
+    case OP_VSTL:
+        agregar_texto(&texto, "local[%llu..%llu] = ", (unsigned long long)inst->indice,
+                      (unsigned long long)(inst->indice + estado.ancho - 1));
+        agregar_numeros(&texto, estado.local + inst->indice, estado.ancho, ", ", 1);
+        break;
     case OP_SEND:
         formatear_numero(numero, estado.registros[inst->src1]);
         agregar_texto(&texto, "envía %s", numero);
@@ -58,12 +67,13 @@ int anotar_efecto(Traza *traza, uint32_t ciclo, uint32_t pe, const Instruccion *
         agregar_numeros(&texto, estado.vectoriales + (size_t)inst->src1 * estado.ancho, estado.ancho, ", ", 1);
         break;
     case OP_VLD: case OP_VADD: case OP_VSUB: case OP_VMUL: case OP_VDIV: case OP_VBCAST: case OP_VRECV:
+    case OP_VLDL:
         agregar_texto(&texto, "v%d = ", inst->dst);
         agregar_numeros(&texto, estado.vectoriales + (size_t)inst->dst * estado.ancho, estado.ancho, ", ", 1);
         break;
-    default:   // MOV, LD, ADD..DIV, RECV, VREDSUM: un registro escalar
+    default:   // MOV, LD, ADD..DIV, RECV, VREDSUM, LDL: un registro escalar, con el nombre escrito
         formatear_numero(numero, estado.registros[inst->dst]);
-        agregar_texto(&texto, "%s = %s", NOMBRES_REGISTROS[inst->dst], numero);
+        agregar_texto(&texto, "%s = %s", inst->nombre_dst, numero);
         break;
     }
     if (texto.error) {

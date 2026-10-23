@@ -27,7 +27,7 @@
 #define VALORES_POR_FILA 10
 
 typedef enum {
-    CATEGORIA_MEMORIA, CATEGORIA_CALCULO, CATEGORIA_COMUNICACION, CATEGORIA_OTRAS, CATEGORIA_NOP,
+    CATEGORIA_MEMORIA, CATEGORIA_LOCAL, CATEGORIA_CALCULO, CATEGORIA_COMUNICACION, CATEGORIA_OTRAS, CATEGORIA_NOP,
     NUM_CATEGORIAS
 } Categoria;
 
@@ -35,6 +35,9 @@ typedef enum {
 static Categoria categoria(Opcode op) {
     if (es_memoria(op)) {
         return CATEGORIA_MEMORIA;
+    }
+    if (es_memoria_local(op)) {
+        return CATEGORIA_LOCAL;
     }
     if (es_aritmetica(op) || es_aritmetica_vectorial(op) || op == OP_VREDSUM) {
         return CATEGORIA_CALCULO;
@@ -250,6 +253,11 @@ static void seccion_configuracion(Reporte *r, const char *carpeta) {
         agregar_linea(r->lineas, "Ancho vectorial:        sin vectores");
     }
     agregar_linea(r->lineas, "Capacidad de memoria:   %u palabras", f->palabras_memoria);
+    if (f->palabras_locales) {
+        agregar_linea(r->lineas, "Memoria local por PE:   %u palabras", f->palabras_locales);
+    } else {
+        agregar_linea(r->lineas, "Memoria local por PE:   sin memoria local");
+    }
     agregar_linea(r->lineas, "%s", "");
     agregar_linea(r->lineas, "Mapa de tipos:");
     for (uint32_t inicio = 0; inicio < f->columnas; inicio += COLUMNAS_POR_TABLA_DE_TIPOS) {
@@ -424,6 +432,9 @@ static void seccion_distribucion(Reporte *r) {
         if (n[OP_ST] || n[OP_VST]) {
             agregar_texto(&tareas, "%salmacena resultados", tareas.largo ? "; " : "");
         }
+        if (n[OP_LDL] || n[OP_STL] || n[OP_VLDL] || n[OP_VSTL]) {
+            agregar_texto(&tareas, "%sguarda y lee datos en su memoria local", tareas.largo ? "; " : "");
+        }
         if (!tareas.largo) {
             agregar_texto(&tareas, "%s", comunica ? "comunica datos" : "sin cálculo ni acceso a memoria");
         }
@@ -447,18 +458,18 @@ static void seccion_actividad(Reporte *r) {
     }
 
     seccion(r, 5, "ACTIVIDAD POR PE");
-    agregar_linea(r->lineas, "Instrucciones por PE (memoria = LD/ST/VLD/VST, cálculo = ADD..DIV, V.. y VREDSUM,");
-    agregar_linea(r->lineas, "comunicación = SEND/RECV/VSEND/VRECV, otras = MOV/VBCAST):");
+    agregar_linea(r->lineas, "Instrucciones por PE (memoria = LD/ST/VLD/VST, local = LDL/STL/VLDL/VSTL,");
+    agregar_linea(r->lineas, "cálculo = ADD..DIV, V.. y VREDSUM, comunicación = SEND/RECV/VSEND/VRECV, otras = MOV/VBCAST):");
     Texto titulo = {0};
     agregar_texto(&titulo, "  ");
     agregar_alineado(&titulo, "PE", ancho_pe, 0);
     agregar_texto(&titulo, "  ");
     agregar_alineado(&titulo, "Tipo", ancho_tipo, 0);
-    agregar_texto(&titulo, "  Memoria  Cálculo  Comunic.  Otras    NOP  Ocupado");
+    agregar_texto(&titulo, "  Memoria  Local  Cálculo  Comunic.  Otras    NOP  Ocupado");
     r->error |= titulo.error;
     agregar_linea_propia(r->lineas, titulo.datos);
 
-    static const int ANCHOS[NUM_CATEGORIAS] = {7, 7, 8, 5, 5};
+    static const int ANCHOS[NUM_CATEGORIAS] = {7, 5, 7, 8, 5, 5};
     for (uint32_t pe = 0; pe < p->pes; ++pe) {
         size_t por_categoria[NUM_CATEGORIAS] = {0};
         for (Opcode op = OP_NOP; op < NUM_OPCODES; ++op) {

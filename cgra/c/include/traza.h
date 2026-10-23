@@ -23,6 +23,7 @@ typedef struct {
 typedef struct {
     const double *registros;     // NUM_REGISTROS
     const double *vectoriales;   // NUM_VECTORIALES * ancho
+    const double *local;         // memoria local; NULL sin palabras_locales
     uint32_t ancho;
 } EstadoPE;
 

@@ -63,6 +63,10 @@ int armar_mapa_y_leyenda(const FormatoCGRA *formato, int con_mapa, Lineas *linea
     if (formato->ancho_vector) {
         agregar_linea(lineas, "Vectores de %u palabras (v0..v%d)", formato->ancho_vector, NUM_VECTORIALES - 1);
     }
+    if (formato->palabras_locales) {
+        agregar_linea(lineas, "Memoria local de %u palabras por PE (local[0..%u])", formato->palabras_locales,
+                      formato->palabras_locales - 1);
+    }
     return lineas->error ? -1 : 0;
 }
 

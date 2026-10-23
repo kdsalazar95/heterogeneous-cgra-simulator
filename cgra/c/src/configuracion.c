@@ -9,7 +9,8 @@
  *   3. "distribucion": reglas por bordes, por paridad de fila o en ciclo.
  *
  * Sin "tipos_pe" todos los PEs son G, con el ISA completo (sin las
- * instrucciones vectoriales si no hay "ancho_vector").
+ * instrucciones vectoriales si no hay "ancho_vector", ni las de memoria local
+ * si no hay "palabras_locales").
  *
  * Las validaciones van en el mismo orden que en Python, para que una
  * configuración con varios errores informe el mismo primero.
@@ -28,6 +29,7 @@
 #include "texto.h"
 
 #define MAXIMO_ANCHO_VECTOR (1u << 20)
+#define MAXIMO_PALABRAS_LOCALES (1u << 24)
 
 static const char *const CAMPOS[] = {"filas", "columnas", "palabras_memoria"};
 static const char *const BORDES[] = {"norte", "sur", "oeste", "este"};
@@ -335,13 +337,26 @@ static int es_una_letra(const char *texto) {
     return isalpha((unsigned char)texto[0]) && texto[1] == '\0';
 }
 
+// El ISA completo del tipo G de una CGRA sin tipos_pe: sin las vectoriales
+// si no hay ancho_vector, ni las locales si no hay palabras_locales.
+static size_t isa_por_defecto(const FormatoCGRA *formato, const char **nombres) {
+    size_t cantidad = 0;
+    for (int op = 0; op < NUM_OPCODES; ++op) {
+        if ((formato->ancho_vector || !es_vectorial((Opcode)op))
+            && (formato->palabras_locales || !es_memoria_local((Opcode)op))) {
+            nombres[cantidad++] = NOMBRES_OPCODES[op];
+        }
+    }
+    return cantidad;
+}
+
 // Las instrucciones de un tipo, en mayúsculas, validadas como en _validar().
 static int leer_instrucciones(const TipoLeido *leido, const FormatoCGRA *formato, TipoPE *tipo) {
-    size_t cantidad = leido->instrucciones ? leido->instrucciones->cantidad
-                    : formato->ancho_vector ? NUM_OPCODES : NUM_OPCODES_ESCALARES;
+    const char *por_defecto[NUM_OPCODES];
+    size_t cantidad = leido->instrucciones ? leido->instrucciones->cantidad : isa_por_defecto(formato, por_defecto);
     char *nombres[cantidad + 1];
-    const char *desconocidas[cantidad + 1], *vectoriales[cantidad + 1];
-    size_t total_desconocidas = 0, total_vectoriales = 0;
+    const char *desconocidas[cantidad + 1], *vectoriales[cantidad + 1], *locales[cantidad + 1];
+    size_t total_desconocidas = 0, total_vectoriales = 0, total_locales = 0;
     int resultado = 0;
 
     tipo->instrucciones = malloc((cantidad + 1) * sizeof *tipo->instrucciones);
@@ -350,7 +365,7 @@ static int leer_instrucciones(const TipoLeido *leido, const FormatoCGRA *formato
     }
     for (size_t i = 0; i < cantidad; ++i) {
         const Json *op = leido->instrucciones ? &leido->instrucciones->elementos[i] : NULL;
-        nombres[i] = strdup(op ? op->texto : NOMBRES_OPCODES[i]);
+        nombres[i] = strdup(op ? op->texto : por_defecto[i]);
         if (!nombres[i]) {
             for (size_t k = 0; k < i; ++k) {
                 free(nombres[k]);
@@ -368,6 +383,9 @@ static int leer_instrucciones(const TipoLeido *leido, const FormatoCGRA *formato
         if (es_vectorial((Opcode)codigo)) {
             vectoriales[total_vectoriales++] = nombres[i];
         }
+        if (es_memoria_local((Opcode)codigo)) {
+            locales[total_locales++] = nombres[i];
+        }
         tipo->instrucciones[tipo->cantidad_instrucciones++] = (Opcode)codigo;
         tipo->permitidas |= 1u << codigo;
     }
@@ -380,6 +398,11 @@ static int leer_instrucciones(const TipoLeido *leido, const FormatoCGRA *formato
     } else if (total_vectoriales && !formato->ancho_vector) {
         agregar_ordenados(&lista, vectoriales, total_vectoriales);
         anotar_error("El tipo '%s' usa instrucciones vectoriales (%s) y falta 'ancho_vector'",
+                     leido->letra, lista.datos ? lista.datos : "");
+        resultado = -1;
+    } else if (total_locales && !formato->palabras_locales) {
+        agregar_ordenados(&lista, locales, total_locales);
+        anotar_error("El tipo '%s' usa instrucciones de memoria local (%s) y falta 'palabras_locales'",
                      leido->letra, lista.datos ? lista.datos : "");
         resultado = -1;
     }
@@ -400,6 +423,7 @@ static int construir(const Json *datos, const TipoLeido *leidos, size_t cantidad
     long long columnas = entero(json_clave(datos, "columnas"));
     long long palabras = entero(json_clave(datos, "palabras_memoria"));
     const Json *ancho = json_clave(datos, "ancho_vector");
+    const Json *locales = json_clave(datos, "palabras_locales");
 
     if (filas <= 0 || columnas <= 0) {
         anotar_error("La malla debe tener al menos una fila y una columna");
@@ -427,6 +451,17 @@ static int construir(const Json *datos, const TipoLeido *leidos, size_t cantidad
             return -1;
         }
         formato->ancho_vector = (uint32_t)entero(ancho);
+    }
+    if (locales && locales->tipo != JSON_NULO) {
+        if (!json_es_entero(locales) || entero(locales) <= 0) {
+            anotar_error("'palabras_locales' debe ser un entero mayor que cero");
+            return -1;
+        }
+        if (entero(locales) > MAXIMO_PALABRAS_LOCALES) {
+            anotar_error("'palabras_locales' no puede ser mayor que %u", MAXIMO_PALABRAS_LOCALES);
+            return -1;
+        }
+        formato->palabras_locales = (uint32_t)entero(locales);
     }
     formato->filas = (uint32_t)filas;
     formato->columnas = (uint32_t)columnas;

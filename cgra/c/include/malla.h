@@ -2,8 +2,9 @@
  * El hardware de la malla y su ejecución ciclo a ciclo, como src/malla.py
  * (PE, Cola, Malla) y CGRA.ejecutar() de src/cgra.py.
  *
- * Cada PE tiene 16 registros escalares y, si la CGRA tiene ancho_vector,
- * 8 registros vectoriales de ancho_vector palabras. Se comunica con sus 4
+ * Cada PE tiene 16 registros escalares, 8 registros vectoriales de
+ * ancho_vector palabras si la CGRA tiene vectores, y una memoria local de
+ * palabras_locales palabras si la tiene. Se comunica con sus 4
  * vecinos por colas FIFO, una por cada sentido de cada conexión.
  */
 
@@ -33,6 +34,7 @@ typedef struct {
 typedef struct {
     double registros[NUM_REGISTROS];
     double *vectoriales;          // [registro * ancho + carril]; NULL sin ancho_vector
+    double *local;                // memoria local del PE; NULL sin palabras_locales
     Cola *salida[4];              // por Direccion; NULL en el borde de la malla
     Cola *entrada[4];
 } PE;

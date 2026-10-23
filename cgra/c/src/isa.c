@@ -19,9 +19,11 @@
 const char *const NOMBRES_OPCODES[NUM_OPCODES] = {
     "NOP", "MOV", "LD", "ST", "ADD", "SUB", "MUL", "DIV", "SEND", "RECV",
     "VLD", "VST", "VADD", "VSUB", "VMUL", "VDIV", "VREDSUM", "VBCAST", "VSEND", "VRECV",
+    "LDL", "STL", "VLDL", "VSTL",
 };
 const char *const DIRECCION_EN_INGLES[4] = {"north", "south", "east", "west"};
 const char *const DIRECCION_EN_ESPANOL[4] = {"norte", "sur", "este", "oeste"};
+// Otros nombres de r0..r4.
 const char *const NOMBRES_REGISTROS[] = {"rA", "rB", "rC", "rT", "acc"};
 
 #define CANTIDAD_NOMBRES (sizeof NOMBRES_REGISTROS / sizeof *NOMBRES_REGISTROS)
@@ -97,6 +99,23 @@ static int convertir_a_float(const char *texto, double *valor) {
     return digitos && resto != limpio && *resto == '\0' ? 0 : -1;
 }
 
+// local[indice], con el patrón ^local\[(\d+)\]$ de isa.py.
+static int operando_local(const char *texto, const char *origen, Instruccion *inst) {
+    const char *c = texto + strlen("local[");
+    int valido = strncmp(texto, "local[", strlen("local[")) == 0 && isdigit((unsigned char)*c);
+    while (valido && isdigit((unsigned char)*c)) {
+        ++c;
+    }
+    if (!valido || c[0] != ']' || c[1] != '\0') {
+        anotar_error("%s: memoria local inválida '%s'", origen, texto);
+        return -1;
+    }
+    errno = 0;
+    unsigned long long indice = strtoull(texto + strlen("local["), NULL, 10);
+    inst->indice = errno == ERANGE ? UINT64_MAX : indice;
+    return 0;
+}
+
 // banco[indice], con el patrón ^([A-Za-z_]\w*)\[(\d+)\]$ de isa.py.
 static int operando_memoria(char *texto, const char *origen, Instruccion *inst) {
     char *corchete = strchr(texto, '[');
@@ -136,6 +155,17 @@ static int registro(Instruccion *inst, int8_t *campo, const char *nombre, int ve
                 *campo = (int8_t)r;
             }
         }
+        // r0..r15, sin ceros a la izquierda (r05 no existe en isa.py).
+        if (nombre[0] == 'r' && isdigit((unsigned char)nombre[1]) && (nombre[1] != '0' || !nombre[2])) {
+            char *fin;
+            long numero = strtol(nombre + 1, &fin, 10);
+            if (!*fin && numero < NUM_REGISTROS) {
+                *campo = (int8_t)numero;
+            }
+        }
+    }
+    if (campo == &inst->dst && !vectorial) {
+        snprintf(inst->nombre_dst, sizeof inst->nombre_dst, "%s", nombre);
     }
     if (*campo != REGISTRO_INVALIDO || inst->registro_invalido) {
         return 0;
@@ -213,6 +243,22 @@ static int resolver(Instruccion *inst, char **a, const char *origen) {
         resultado |= registro(inst, &inst->src2, a[2], v);
         resultado |= registro(inst, &inst->dst, a[0], v);
         agregar_texto(&texto, "%s %s, %s, %s", NOMBRES_OPCODES[op], a[0], a[1], a[2]);
+        break;
+    case OP_LDL:
+    case OP_VLDL:
+        if (operando_local(a[1], origen, inst) != 0) {
+            return -1;
+        }
+        resultado = registro(inst, &inst->dst, a[0], v);
+        agregar_texto(&texto, "%s %s, local[%llu]", NOMBRES_OPCODES[op], a[0], (unsigned long long)inst->indice);
+        break;
+    case OP_STL:
+    case OP_VSTL:
+        if (operando_local(a[0], origen, inst) != 0) {
+            return -1;
+        }
+        resultado = registro(inst, &inst->src1, a[1], v);
+        agregar_texto(&texto, "%s local[%llu], %s", NOMBRES_OPCODES[op], (unsigned long long)inst->indice, a[1]);
         break;
     case OP_VREDSUM:   // escalar <- suma de un vector
     case OP_VBCAST:    // vector <- un escalar en todos los carriles

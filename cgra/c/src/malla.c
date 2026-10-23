@@ -31,13 +31,14 @@ int crear_malla(Malla *malla, const FormatoCGRA *formato) {
     size_t colas = 2 * ((size_t)filas * (columnas - 1) + (size_t)(filas - 1) * columnas);
     size_t ancho = formato->ancho_vector ? formato->ancho_vector : 1;
     size_t por_pe = formato->ancho_vector ? NUM_VECTORIALES * ancho : 0;
+    size_t locales = formato->palabras_locales;
 
     malla->filas = filas;
     malla->columnas = columnas;
     malla->ancho = formato->ancho_vector;
     malla->pes = calloc(pes, sizeof *malla->pes);
     malla->colas = calloc(colas ? colas : 1, sizeof *malla->colas);
-    malla->valores = calloc(pes * por_pe + colas * ancho + 1, sizeof *malla->valores);
+    malla->valores = calloc(pes * (por_pe + locales) + colas * ancho + 1, sizeof *malla->valores);
     if (!malla->pes || !malla->colas || !malla->valores) {
         anotar_error("Sin memoria para crear la malla de %ux%u", filas, columnas);
         liberar_malla(malla);
@@ -47,6 +48,9 @@ int crear_malla(Malla *malla, const FormatoCGRA *formato) {
     double *valores = malla->valores;
     for (size_t pe = 0; pe < pes && por_pe; ++pe, valores += por_pe) {
         malla->pes[pe].vectoriales = valores;
+    }
+    for (size_t pe = 0; pe < pes && locales; ++pe, valores += locales) {
+        malla->pes[pe].local = valores;
     }
     for (size_t c = 0; c < colas; ++c, valores += ancho) {
         malla->colas[c].valores = valores;
@@ -171,6 +175,18 @@ static int ejecutar_instruccion(Malla *malla, uint32_t numero_pe, const Instrucc
             dst[k] = r[inst->src1];
         }
         break;
+    case OP_LDL:      // la memoria local: índices ya revisados al cargar
+        r[inst->dst] = pe->local[inst->indice];
+        break;
+    case OP_STL:
+        pe->local[inst->indice] = r[inst->src1];
+        break;
+    case OP_VLDL:
+        memcpy(dst, pe->local + inst->indice, ancho * sizeof *dst);
+        break;
+    case OP_VSTL:
+        memcpy(pe->local + inst->indice, a, ancho * sizeof *a);
+        break;
     case OP_SEND:
     case OP_VSEND: {
         Cola *cola = pe->salida[inst->dir];
@@ -249,7 +265,8 @@ int ejecutar_cgra(const Programas *programas, const FormatoCGRA *formato, Memori
                 }
                 resultado = ejecutar_instruccion(&malla, pe, inst, memoria, formato, ciclo);
                 if (resultado == 0 && traza) {
-                    EstadoPE estado = {malla.pes[pe].registros, malla.pes[pe].vectoriales, malla.ancho};
+                    EstadoPE estado = {malla.pes[pe].registros, malla.pes[pe].vectoriales, malla.pes[pe].local,
+                                       malla.ancho};
                     resultado = anotar_efecto(traza, ciclo, pe, inst, estado, memoria) == 0 ? 0 : ERROR_EJECUCION;
                 }
             }

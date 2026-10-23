@@ -380,6 +380,34 @@ static int validar_tipos(const Programas *programas, const FormatoCGRA *formato)
     return errores || detalle.error ? -1 : 0;
 }
 
+// Programa._revisar_local(): un LDL/STL (VLDL/VSTL) debe caber en la memoria
+// local del PE.
+static int revisar_local(const Instruccion *inst, const FormatoCGRA *formato, const char *id, uint32_t ciclo) {
+    uint64_t palabras = inst->op == OP_VLDL || inst->op == OP_VSTL ? formato->ancho_vector : 1;
+    if (palabras == 0) {
+        anotar_error("%s, ciclo %u: %s necesita 'ancho_vector' en cgra.json", id, ciclo, NOMBRES_OPCODES[inst->op]);
+        return -1;
+    }
+    if (formato->palabras_locales == 0) {
+        anotar_error("%s, ciclo %u: %s necesita 'palabras_locales' en cgra.json", id, ciclo,
+                     NOMBRES_OPCODES[inst->op]);
+        return -1;
+    }
+    if (inst->indice > formato->palabras_locales || palabras > formato->palabras_locales - inst->indice) {
+        char ocupa[64];
+        if (palabras == 1) {
+            snprintf(ocupa, sizeof ocupa, "local[%llu]", (unsigned long long)inst->indice);
+        } else {
+            snprintf(ocupa, sizeof ocupa, "local[%llu..%llu]", (unsigned long long)inst->indice,
+                     (unsigned long long)(inst->indice + palabras - 1));
+        }
+        anotar_error("%s, ciclo %u: %s se sale de la memoria local (%u palabras)", id, ciclo, ocupa,
+                     formato->palabras_locales);
+        return -1;
+    }
+    return 0;
+}
+
 // Programa.enlazar(): banco[indice] pasa a ser la dirección de banco +
 // indice en la memoria plana. Un VLD/VST usa ancho_vector palabras desde
 // ahí, y todas deben caber en la región. Recorre las instrucciones en el
@@ -390,6 +418,13 @@ static int enlazar(Programas *programas, const FormatoCGRA *formato, const Memor
         for (uint32_t k = 0; k < programas->ciclos; ++k) {
             uint32_t ciclo = programas->orden_archivo[(size_t)pe * programas->ciclos + k];
             Instruccion *inst = &programas->por_pe[(size_t)pe * programas->ciclos + ciclo];
+            if (es_memoria_local(inst->op)) {
+                generar_pe_id(id, formato, pe);
+                if (revisar_local(inst, formato, id, ciclo) != 0) {
+                    return -1;
+                }
+                continue;
+            }
             if (!es_memoria(inst->op)) {
                 continue;
             }
