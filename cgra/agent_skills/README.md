@@ -135,7 +135,16 @@ DIV  dst, src1, src2                     x                           x
 SEND dir, reg               x            x            x              x
 RECV dir, reg               x            x            x              x
 NOP                         x            x            x              x
+LDL  reg, local[index]                   x            x              x
+STL  local[index], reg                   x            x              x
 ```
+
+Every PE has 16 scalar registers, `r0` .. `r15` (`rA`, `rB`, `rC`, `rT` and
+`acc` are `r0` .. `r4`). With `palabras_locales` in `src/cgra.json`, every
+compute PE also has its own **local memory** of that many words: `LDL`/`STL`
+(and `VLDL`/`VSTL` for vectors) read and write it with `local[index]`. Only the
+memory PEs access the data memory (`memoria.bin`); a compute PE keeps there
+the data it received and will reuse.
 
 G combines the memory and compute instruction permissions actually configured
 for it. With no vector width it uses only the scalar ISA. Never infer G's
@@ -156,6 +165,8 @@ VREDSUM reg, vreg                        x             x     sum of the W lanes
 VBCAST  vreg, reg                        x             x     a scalar to the W lanes
 VSEND dir, vreg             x            x             x     the whole vector, 1 cycle
 VRECV dir, vreg             x            x             x
+VLDL vreg, local[index]                  x             x     W words of the local memory
+VSTL local[index], vreg                  x             x
 ```
 
 Memory-capable PEs load operands and send them to the compute PEs when separate;

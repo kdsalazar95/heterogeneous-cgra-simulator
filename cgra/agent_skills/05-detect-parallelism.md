@@ -126,6 +126,14 @@ parallel_work:
 tail_work:
   the output columns after the last full segment of each row, as the scalar
   output elements above
+reuse (local memory, skill 06):
+  convolucion:  the kernel is the same for every segment, and each image
+                vector is used by K output rows; the PEs keep the kernel in
+                local memory, and the tiling sends each image vector once
+                along a lane of PEs
+  matmul:       a[i][*] is used by every segment of row i, and each block of
+                b by every output row; the tiling keeps rows of a in local
+                memory and sends each vector of b once along a lane of PEs
 ```
 
 ## Notes

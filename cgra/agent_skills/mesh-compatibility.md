@@ -102,7 +102,7 @@ limitation. Do not request a larger mesh merely because execution takes tiles.
 | Situation | Required behavior |
 |---|---|
 | Few compute PEs | reuse them for multiple work units/tiles |
-| Few memory PEs | share servers, serialize conflicting accesses and relay over valid paths |
+| Few memory PEs | only the compute PEs next to a server get work (skill 06, Workers); the rest stay idle or relay. The tiling lanes of matmul and convolucion are the exception |
 | More PEs than work | leave unused PEs in `NOP`; initialize any partial accumulator that is actually reduced |
 | No memory-capable PE | operation error: no way to load operands/store outputs |
 | No required arithmetic | operation error, even on a large mesh |
@@ -122,9 +122,9 @@ insertion, or external streaming. Those need separate ISA/compiler contracts.
 Build paths from north/south/east/west neighbors. Each scalar hop requires
 `SEND` on its sender and `RECV` on its receiver; vector hops require
 `VSEND/VRECV` at every endpoint and relay. Validate outbound and return paths.
-Use the nearest compatible server by path length; break ties by row-major PE
-order. A local memory-capable compute PE has path length zero. The existing
-two-server `M C M` optimization remains available when both routes are valid.
+A compute PE gets work only from a server next to it (skill 06, Workers); a
+local memory-capable G needs no server. The two-server `M C M` group is used
+whenever a row has exactly 3 columns.
 
 For example, `M E V` has a scalar path but no direct vector path through `E`.
 Do not claim that scalar relays alone can assemble a vector at the destination.
@@ -132,10 +132,9 @@ For an arbitrary explicit map, choose a feasible subset of compute PEs instead
 of requiring every compute PE to participate. Unused PEs may still relay.
 
 The border-layout reduction route in skill 06 is a specialization, not a
-universal requirement. In a column, reduce upward through compatible compute
-PEs and send the result to the memory at row 0. With `G` alone, store locally.
-With an arbitrary map, select a compatible reduction tree or gather partials
-at a reachable accumulator. A scalar tree needs `ADD` at its combining nodes;
+universal requirement. Every other map uses the gathering route of skill 07:
+each partial travels alone to a root with `ADD`, and M and V only relay it.
+With `G` alone, store locally. A scalar tree needs `ADD` at its combining nodes;
 a `V` can relay scalars but cannot add them. A connected vector tree can instead
 combine vector partials with `VADD`, then run `VREDSUM` once at its root.
 Never combine a scalar sum by broadcasting it and reducing all lanes: that
@@ -148,37 +147,17 @@ there is no inter-compute reduction, only a local sum and output transfer.
 
 ## Tiling Contract
 
-Use the ordered eligible compute lists from the manifest. Do not calculate a
-zero-width tile using `columnas - 2` for one- or two-column meshes.
+Work units and their assignment are in skill 06 (Work Units and Assignment):
+every `n` of vector units is tried, each unit goes to the group that would
+finish first, and the lowest total wins. Do not compute zero-width tiles with
+`columnas - 2` for one- or two-column meshes. Matmul and convolucion can use the
+local-memory tiling of skill 06 (lanes and chunks of `rho` output rows) when
+it costs less than the groups.
 
-- Scalar outputs: unit e goes to eligible PE `e mod P_s` in round `e // P_s`.
-- Vector outputs: a unit is W contiguous columns in one output row; unit e
-  goes to vector PE `e mod P_v` in round `e // P_v`.
-- The rectangular scalar tile in skill 06 remains valid for the uniform
-  border layout. Other layouts use explicit unit lists and round numbers.
-- A `C/G` shared between vector and scalar phases cannot execute both at
-  once. Schedule its remainder after its vector work, or reserve it for scalar
-  work before computing capacities. Never count the same PE twice in parallel.
-- If `P_v = 0`, use scalar work. If the scalar-only set is empty, use reachable
-  `C/G` for scalar work; never divide by zero or assign scalar arithmetic to V.
-- Costs in the adjacent-pair tables are estimates for that topology only.
-  Include server sharing and relay cycles when comparing other assignments.
+- A C with vector and scalar units runs them as two phases, never both in
+  one cycle. A V never takes scalar units; an E never takes vector units.
+- If no group can take a unit (a tail with only V groups), report the
+  operation as unsupported on that map.
 - Reset each output accumulator before its next output unit. In reduction,
-  retain the local partial sum across input blocks until final combination.
-- Edge rounds do not load/store nonexistent units. Pad idle PEs with `NOP`,
-  except for explicitly scheduled relays, shared-server work or reduction work.
-
-## Acceptance Cases for the Later Implementation
-
-Validate the three source operations with automatic layouts `1x1`, `1x2`,
-`2x1`, `1x3`, `3x1`, `2x2`, `3x2`, `1x4`, `2x3`, `2x4`, `1x10`, `2x10`,
-`3x4`, `4x3` and a normal wider mesh such as `6x10`. Check that 2x3 uses
-two M C M rows, narrow cases follow their own precedence, and normal meshes
-keep the original E/V/C row rotation. Cover both dimension orderings, exact and partial vector units,
-multiple tile rounds, inactive edge units and coordinate widths beyond one digit.
-Also cover explicit all-memory, all-compute, scalar-only, vector-only with/without
-tails, mixed rows with blocked vector routes, consecutive V reduction nodes,
-generic PEs, too-small memory and a valid route to output other than `PE00`.
-Check computed results, exact output coverage, accumulator lifetimes, instruction
-permissions, all transfers, memory bounds and complete regenerated PE files.
-These are acceptance requirements, not a claim that those tests have passed.
+  keep the local partial sum across input blocks until the final route.
+- Groups with no units pad with `NOP`, except for relays and the reduction route.

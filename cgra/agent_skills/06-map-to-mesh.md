@@ -8,27 +8,40 @@ the [Mesh Compatibility Contract](mesh-compatibility.md) first. The geometric
 formulas below specialize the standard border layout; they must not be used
 for one/two-column or arbitrary explicit layouts. Always use the actual map.
 
-## Local, Narrow and Explicit Layouts
+## Workers
 
-Use `topologia`, eligible PE lists, servers, routes and `output_pe` from the
-manifest. For local G, set its server to itself and use no transfer. For Nx1,
-memory is at row 0, compute starts at row 1, and transfers go north/south.
-For Nx2, each row's west M serves its east C. With one or two rows and at
-least 3 columns, keep M at both ends and use only C in the interior. With
-3 columns (1x3 or 2x3), use both servers for each row's C. Wider special
-rows use the nearest border server and compatible relays through C, as in
-the existing shared-server rules. For other explicit maps, find compatible paths as specified by the
-contract; do not invent a border memory PE or arithmetic at a memory-only PE.
+A memory PE issues one instruction per cycle, and the adjacent tables of skill
+07 already keep it busy almost every cycle (`LD`, `SEND`, `LD`, `SEND`...). A
+compute PE farther from its server would only add relay hops without being
+fed any faster. So, on every map, **only a compute PE next to a server gets
+work**, in one of these groups:
 
-For at least 3 rows and 3 columns, retain the original normal-mesh mapping
-and E/V/C row rotation. Special C-only compute rows use separate scalar and
-vector phases or a reserved subset of C for scalar work; do not assume an E
-row exists or schedule two instructions on a C in the same cycle.
+| Layout | Groups (server -> compute PE) | Tables of skill 07 |
+|---|---|---|
+| 1x1 | `local`: the G loads, computes and stores | Local Execution |
+| Nx1, N >= 2 | one vertical pair: PE(0,0) -> PE(1,0), `to C = south` | adjacent (single server) |
+| 2 columns | one pair per row: PE(f,0) -> PE(f,1), `to C = east` | adjacent (single server) |
+| 3 columns | one double group per row: PE(f,0) and PE(f,2) -> PE(f,1) | Two Servers |
+| 4 or more columns | two pairs per row: PE(f,0) -> PE(f,1), `to C = east`, and PE(f,C-1) -> PE(f,C-2), `to C = west` | adjacent (single server) |
 
-Use eligible-list tiling for these cases, including a single worker. Record
-every unit, owner, phase and round. With one worker, input/output transfers and
-computation repeat until the full problem is covered. A singleton G needs
-neither a compute-to-compute reduction nor an output transfer.
+The rule depends only on the column count, so it is the same for the normal
+E/V/C mesh and for the small layouts. A group needs a memory-capable server
+(`LD`/`ST`, plus `VLD`/`VST`/`VSEND`/`VRECV` for vector work) and a compute
+PE without memory access. The rows of Nx1 below row 1 and the compute PEs that
+are not next to a server get no work: they stay in `NOP`, except as relays and
+in the reduction route. Groups never share a PE, so they all run at the same
+time.
+
+A group is **scalar** if its compute PE has `ADD` and `MUL` (E, C, G) and
+**vector** if it has the vector instructions and its servers can move vectors
+(V, C). A C is both, a V only vector and an E only scalar. The local G runs
+scalar work only (local vector execution is not implemented). With an
+explicit map, apply the same rule to the PEs that have those capabilities.
+
+Matmul and convolucion may use the local-memory tiling instead
+([matmul](#matmul-local-memory-tiling),
+[convolucion](#convolucion-local-memory-tiling)), whose lanes do give work to
+the PEs farther from the server.
 
 ## Standard Border Mesh
 
@@ -37,8 +50,9 @@ memory PEs:   PE(f, 0) and PE(f, columnas - 1)       for 0 <= f <= filas - 1
 compute PEs:  PE(f, c) with 1 <= c <= columnas - 2   (the compute block)
 
 M = memoria:   LD, ST, VLD, VST, SEND, RECV, VSEND, VRECV, MOV, NOP  (moves data, never computes)
-E = escalar:   ADD, SUB, MUL, DIV, SEND, RECV, MOV, NOP              (scalar only, never touches memory)
-V = vectorial: VADD..VDIV, VREDSUM, VBCAST, SEND, RECV, VSEND, VRECV, MOV, NOP  (vector only)
+E = escalar:   ADD, SUB, MUL, DIV, SEND, RECV, MOV, NOP, LDL, STL    (scalar only, never touches the data memory)
+V = vectorial: VADD..VDIV, VREDSUM, VBCAST, SEND, RECV, VSEND, VRECV, MOV, NOP,
+               LDL, STL, VLDL, VSTL                                  (vector only)
 C = computo:   E + V                                                 (scalar and vector)
 G = generico:  memory + scalar compute, and vector instructions when configured
 ```
@@ -92,15 +106,9 @@ for the compute PE PE(f, c):
   direction back to the server = the opposite one
 ```
 
-Only `PE(f, 1)` and `PE(f, columnas - 2)` are next to their server (`d = 1`).
-With exactly two compute columns every memory PE serves one compute PE; with
-more, each memory PE serves several, and the farther ones are reached through
-the compute PEs in between.
-
-A value for a compute PE at distance `d > 1` crosses the compute PEs in between
-one hop per cycle; they relay it through `rT` (`RECV` then `SEND` on the next
-cycle). If a memory PE serves several compute PEs, it serves them one after
-another (skill 07).
+Only `PE(f, 1)` and `PE(f, columnas - 2)` are next to their server (`d = 1`),
+and only they receive work (see [Workers](#workers)). The compute PEs between
+them take part only in the reduction route.
 
 ### Two Servers (`columnas = 3`)
 
@@ -119,23 +127,54 @@ vector steps; the second is `b`, the image pixel or the vector factor. The
 reduction route does not change: its last hop still goes to `PE(0, 0)`, which
 stores `result[0]`. Skill 07 has the tables for this case.
 
-## Reduccion: Scalar Border Assignment
+## Work Units and Assignment
 
-Number the compute PEs in row-major order (`P_c = filas * (columnas - 2)` of
-them). Iteration `i` goes to compute PE number `p = i mod P_c`:
+The work is split into units:
 
 ```text
-fila    = p // (columnas - 2)
-columna = 1 + p mod (columnas - 2)
+reduccion             vector unit: block j = elements jW .. jW+W-1 of a, b and c
+                      scalar unit: one element i
+matmul, convolucion   vector unit: segment (i, j0) = output row i, columns j0 .. j0+W-1,
+                                   j0 = s * W for s = 0 .. salida_columnas // W - 1
+                      scalar unit: one output element (i, j)
 ```
 
-Use this interleaving rule for this specialization. Every selected PE must
-support scalar arithmetic; V cannot own a scalar unit. Other layouts use
-`eligible_compute_pes[i mod count]`. For iteration `i`,
-the server of that compute PE loads `a[i]` and `b[i]`, the compute PE adds them
-and accumulates the sum in `acc`, and the server stores `c[i]`. When `N` is
-larger than `P_c`, each compute PE gets `ceil(N / P_c)` or `floor(N / P_c)`
-iterations of that interleaved sequence.
+Vector units are numbered in order (block `j`, or segment `e = i * segs + s`
+in row-major order). For a number `n` of vector units, the first `n` are
+vector work, and every element they do not cover is a scalar unit, in
+row-major order (the elements after the last block, the column tail of every
+output row, and any segment left to scalar work).
+
+Cost of one unit, in cycles of the tables of skill 07 (`steps` is `N` in
+matmul and `K * K` in convolucion):
+
+```text
+                          local G       pair          double (3 columns)
+reduccion      scalar     5             6             5
+               vector     -             6             6
+matmul,        scalar     4*steps + 2   4*steps + 4   4*steps + 4
+convolucion    vector     -             5*steps + 4   5*steps + 4
+```
+
+With the [local kernel](#convolucion-local-kernel), a vector unit of
+convolucion on a pair costs `4*steps + 4` instead, and the first vector unit
+of each group also pays the preload, `3*steps + 1`.
+
+For every `n` from 0 to the number of whole vector units:
+
+1. Each vector unit, in order, goes to the vector group whose accumulated cost
+   would be the lowest after taking it (on a tie, the first group: row by row,
+   the west pair before the east pair).
+2. Then each scalar unit, in order, goes the same way to a scalar group.
+3. The cost of `n` is the largest accumulated cost of any group.
+
+Keep the `n` with the lowest cost; on a tie, the largest `n`. An `n` is
+impossible if it leaves vector units and there is no vector group, or scalar
+units and there is no scalar group (a tail with only V PEs). If every `n` is
+impossible, report the operation as unsupported on that map: for example,
+matmul and convolucion on `M V M`, whose column tail needs scalar arithmetic.
+A C may get vector and scalar units: it runs all its vector units first and
+then its scalar units, as two phases.
 
 ## Reduccion: Border Reduction Route
 
@@ -160,28 +199,22 @@ store:        PE(0, 1) -> PE(0, 0), and PE(0, 0) stores result[0]
 ```
 
 The scalar border route has `(columnas - 3) + (filas - 1) + 1` hops in
-sequence. Vector-only rows need the adjustments below. Other layouts use the
-recorded reduction plan and output PE; PE00 is preferred, not mandatory.
+sequence. Vector-only rows need the adjustments below.
 
-## Matmul and Convolucion: Scalar Border Output Tiles
+Use this route only when the mesh has at least 3 rows and 3 columns, every row
+has memory PEs at both ends and a single compute type between them, `PE(0, 1)`
+has `ADD`, and no two consecutive rows are V. Every compute PE between the
+borders takes part, including those with no work: they start with
+`MOV acc, 0.0` (a V clears `v4` with `MOV rT, 0.0` and `VBCAST v4, rT`). Any
+other map (narrow meshes, explicit maps, consecutive V rows) uses the
+gathering route of skill 07, which ends at `PE00`.
 
-This rectangular formula applies when all listed compute positions are scalar
-eligible. With V rows, use the vector/scalar work lists below. For narrow or
-irregular maps, use the ordered eligible lists from the compatibility contract.
+## Matmul and Convolucion: Scalar Units
 
-One compute PE per output element, with the **compute block** sliding over the
-output in tiles of `tile_filas x tile_columnas` (the compute block of the
-manifest: `filas x (columnas - 2)`). Number the compute PEs inside the block by
-`(bf, bc)`, from 0. For every tile starting at
-`(inicio_fila, inicio_columna)`, the compute PE at block position `(bf, bc)`
-owns:
-
-```text
-global_fila    = inicio_fila + bf
-global_columna = inicio_columna + bc
-```
-
-The compute PE at block position `(bf, bc)` is `PE(bf, bc + 1)`.
+Each scalar unit is one output element `(i, j)`, computed by the group that
+[Work Units and Assignment](#work-units-and-assignment) gives it. Below,
+`global_fila = i` and `global_columna = j`. A group computes its units one
+after another; each one is a tile of skill 07 (`4 * steps + 4` cycles).
 
 ### Operands of Each Step
 
@@ -199,11 +232,9 @@ convolucion  (I = image side, K = kernel side, S = I - K + 1)
   rB <- imagen[(global_fila + ki) * I + global_columna + kj]
 ```
 
-An operand shared by a row (`a` in matmul) or by the whole tile (`kernel`) is
-loaded by every memory PE that needs it, once per memory PE: with memory on both
-sides of every row, each memory PE loading it for its own compute PE is cheaper than relaying
-it through compute PEs that are busy computing. When a memory PE serves several
-compute PEs, it loads a shared operand once and sends it to all of them.
+An operand shared by several outputs (`a` in matmul, `kernel` in convolucion)
+is loaded again by every server that needs it: each server feeds only its own
+compute PE, and loading is cheaper than relaying it through busy compute PEs.
 
 ### Stores
 
@@ -215,65 +246,24 @@ ST result[global_fila * N + global_columna], rC          (matmul)
 ST result[global_fila * S + global_columna], rC          (convolucion)
 ```
 
-Walk the output tile by tile, row of tiles first, and restart the accumulators
-on every tile.
+Restart the accumulator on every output element.
 
 ## Vectorial Mode
 
-In `vectorial` mode (manifest, skill 01) the servers and the reduction route do
+In `vectorial` mode (manifest, skill 01) the groups and the reduction route do
 not change; only the work units do. `W` is `ancho_vector`. The memory PEs (`M`)
-serve both scalars and vectors, so every compute PE is served by the `M` of its
-row as before. A vector compute PE (`V` or `C`) does the blocks of `W` elements
-(a C/G may also use scalar instructions, e.g. to accumulate VREDSUM results)
-and a scalar-assigned PE handles scalar units. The border examples use E for
-that group; the compatibility contract covers C/G phases. Number each assigned
-class apart, in row-major
-order:
-
-```text
-vector compute PEs:  q = 0 .. P_v - 1      (vector_compute_pes)
-scalar compute PEs:  r = 0 .. P_s - 1      (scalar_compute_pes)
-```
-
-In the standard row-homogeneous layout, disjoint vector and scalar groups may
-work **at the same time** on separate rows. Other maps need explicit link/server
-reservations, and shared C/G need separate phases. Split the work so both groups
-end together: a vector PE is faster, but leaving the scalar rows idle wastes
-them. The cost of one unit comes from the tables of skill 07:
-
-```text
-                         vector unit (W elements)    scalar element
-reduccion                6                           6  (5 with two servers)
-matmul / convolucion     5 * steps + 4               4 * steps + 4
-```
-
-`steps` is the length of the accumulation (`N` in matmul, `K * K` in
-convolucion). Give the vector PEs the first `n` units, and the scalar PEs
-every element they do not cover, with `n` chosen as:
-
-```text
-T_v(n) = ceil(n / P_v) * cost_vector
-T_s(n) = ceil((elements - n * W) / P_s) * cost_scalar
-n      = the value from 0 to the number of whole units that gives the lowest
-         max(T_v(n), T_s(n)); on a tie, the largest n
-```
-
-Try every `n` for this adjacent, disjoint-resource specialization. If P_v is
-zero, run scalar work. If the scalar-only set is empty, use reachable C/G for
-the tail in a later phase or reserve them before splitting. A V cannot do the
-scalar tail. If no such route/capability exists, report the unsupported tail.
-Do not evaluate these formulas with a zero denominator. For shared/distant
-servers, include actual delivery and return costs; these table costs alone do
-not establish an optimal partition.
+serve both scalars and vectors. A vector group (V or C) does vector units and
+a scalar group (E, C or G) scalar units; the split between them is the `n` of
+[Work Units and Assignment](#work-units-and-assignment), which tries every
+`n` instead of a fixed formula. Groups on different PEs run at the same time;
+a C with both kinds of units runs them as two phases.
 
 ### Reduccion
 
 ```text
-blocks:  the first n blocks (n from the split above, at most N // W);
-         block j covers a[jW .. jW+W-1], b[...], c[...]
-         block j -> vector compute PE q = j mod P_v
-scalar:  the elements i = n*W .. N-1;  the t-th of them (t = i - n*W)
-         -> scalar compute PE r = t mod P_s, as a scalar iteration
+blocks:  the first n blocks; block j covers a[jW .. jW+W-1], b[...], c[...]
+scalar:  the elements i = n*W .. N-1, as scalar iterations
+owner:   the group given by Work Units and Assignment
 ```
 
 Then every compute PE joins the reduction route above with its partial sum.
@@ -301,9 +291,8 @@ The output is split by rows into **segments** of `W` contiguous columns:
 segs per row = salida_columnas // W
 segment      = (i, j0) with j0 = s * W, s = 0 .. segs - 1, numbered e in
                row-major order (e = i * segs + s)
-vector work  = the first n segments (n from the split above)
-tile t       -> vector compute PE q owns segment e = t * P_v + q
-               (none if e is past the n-th segment: that pair emits NOP)
+vector work  = the first n segments (n from Work Units and Assignment)
+owner        = the vector group that the assignment gives each segment
 ```
 
 In every step of the accumulation the server loads one scalar and one vector
@@ -330,40 +319,168 @@ VST result[i * S + j0], v3          (convolucion)
 The **scalar work** is every output element that is not in one of those `n`
 segments: the segments left to the scalar rows, and the columns
 `j = segs * W .. salida_columnas - 1` of every row. Number those elements in
-row-major order; the `e`-th goes to scalar compute PE `e mod P_s` in tile
-`e // P_s`, and is computed with the scalar operands and stores above
-(`LD rB` instead of `VLD`). The vector tiles and the scalar tiles run at the
-same time, on their own rows.
+row-major order; each goes to the scalar group that the assignment gives it,
+and is computed with the scalar operands and stores above (`LD rB` instead of
+`VLD`). Vector and scalar groups run at the same time on different PEs.
+
+#### Convolucion: Local Kernel
+
+The kernel is the same for every segment, so a vector group keeps it in the
+local memory of its compute PE instead of receiving it in every step. Use it
+on adjacent pairs when `palabras_locales >= K * K * W` and the vector compute
+type has `VSTL` and `VLDL`; otherwise (Two Servers, no local memory) keep the
+operands above.
 
 ```text
-vector tiles = ceil(n / P_v)                                        (vector PEs)
-scalar tiles = ceil((salida_filas * salida_columnas - n * W) / P_s)    (scalar PEs)
+preload   once per vector group, before its first segment, for st = 0 .. K*K-1:
+            server:  rA <- kernel[st]                       (LD, SEND)
+            compute: v0 <- rA in every lane, stored at local[st * W]
+step      (ki, kj), st = ki * K + kj:
+            server:  v1 <- imagen[(i + ki) * I + j0 + kj]    (VLD, VSEND)
+            compute: v0 <- local[st * W]                     (VLDL)
 ```
+
+The scalar units do not change: an `E` or `C` still needs `RECV`, `LDL`, `MUL`
+and `ADD` per step, the same 4 cycles as receiving the kernel. Reduccion does
+not use the local memory: no operand is used twice. Matmul and convolucion
+also use it in the tilings below.
+
+## Matmul: Local-Memory Tiling
+
+In matmul the row `a[i][*]` is used by every segment of output row `i`, and
+the column block `b[*][j0 .. j0+W-1]` by every output row. The tiling keeps
+rows of `a` in the local memory of the compute PEs and sends every vector of
+`b` once along a **lane**, a chain of compute PEs fed by one server, where
+every PE uses it and passes it on. Unlike the groups, all the PEs of a lane
+get work.
+
+Use it only when all of this holds; otherwise keep the groups:
+
+- `vectorial` mode, at least 4 columns, `N % W == 0` and
+  `palabras_locales >= N`;
+- the lane PEs have `VRECV`, `VSEND`, `VSTL`, `LDL`, `VBCAST`, `VMUL` and
+  `VADD`, and the servers `VLD`, `VSEND`, `VRECV` and `VST`;
+- its cost (below) is lower than the cost of the groups
+  ([Work Units and Assignment](#work-units-and-assignment)). On a tie, keep
+  the groups.
+
+Record the choice in the manifest as `esquema = tiling` or `esquema = grupos`.
+
+### Lanes
+
+Every row has two lanes, one per server; a PE belongs to the lane of its
+nearest server (the west one on a tie):
+
+```text
+lw = ceil((columnas - 2) / 2)
+west lane of row f:  server PE(f, 0),            PEs PE(f, 1) .. PE(f, lw),              away = east
+east lane of row f:  server PE(f, columnas - 1), PEs PE(f, columnas - 2) .. PE(f, lw + 1), away = west
+```
+
+PE number `d = 1, 2, ...` of a lane is the one at distance `d` from its
+server; `to M` is the opposite of `away`. A lane is used only if all its PEs
+are vector compute PEs (V or C), so the E rows get no work. Number the lanes
+row by row, the west lane before the east one.
+
+### Tiles and Units
+
+```text
+rho      tile height: 1 .. the number of PEs of the longest lane
+chunk    rho consecutive output rows: (0 .. rho-1), (rho .. 2rho-1), ...; the last may be shorter
+unit     (chunk, s), s = 0 .. N/W - 1, in order: chunk by chunk, s ascending
+```
+
+A lane that runs a chunk of `L` rows uses its first `L` PEs: PE `d` keeps
+`a[chunk[d-1]][0 .. N-1]` at `local[0 .. N-1]` and computes the segment
+`(chunk[d-1], j0 = s * W)` of every unit of that chunk. Its other PEs stay
+in `NOP`.
+
+Cost, in exact cycles of the tables of skill 07:
+
+```text
+load  (a new chunk of L rows)   2 * L * N / W + 1
+pass  (one unit, L rows)        6 * N + 4 * L - 1
+```
+
+For every `rho`:
+
+1. Each unit, in order, goes to the lane that would finish it first: its
+   accumulated cost, plus `load` if the last chunk of that lane is a
+   different one, plus `pass`. Only lanes with at least `L` PEs can take it;
+   on a tie, the first lane.
+2. The cost of `rho` is the largest accumulated cost of any lane.
+
+Keep the `rho` with the lowest cost (on a tie, the smallest `rho`). If no lane
+can take a unit, the tiling does not apply. Lanes without units stay in `NOP`.
+
+For matmul `32x32` with `W = 4` the tiling was measured in the simulator
+against the groups (cycles): 3x4 13024 vs 9184 (groups kept), 4x6 6896 vs 8036,
+2x10 3832 vs 10496, 8x8 2199 vs 3608, 6x10 2176 vs 4592, 12x12 1088 vs 2296,
+32x32 332 vs 984. Each server feeds more PEs as the rows get longer, so the
+tiling wins on wide meshes and loses on narrow ones.
+
+## Convolucion: Local-Memory Tiling
+
+In convolucion the vector `imagen[r][c .. c+W-1]` is used by the `K` output
+rows `i = r - K + 1 .. r` of the same segment, and the kernel by every
+segment. The tiling uses the [lanes](#lanes) of matmul: the PEs of a lane
+compute consecutive output rows of one segment, every PE keeps the kernel in
+its local memory, and every image vector goes once along the lane, where the
+PEs whose window contains it use it.
+
+Use it only when all of this holds; otherwise keep the groups (with the
+[local kernel](#convolucion-local-kernel) when it applies):
+
+- `vectorial` mode, at least 4 columns, `S % W == 0` and
+  `palabras_locales >= K * K * W`;
+- the lane PEs have `RECV`, `SEND`, `VBCAST`, `VSTL`, `VRECV`, `VSEND`,
+  `VLDL`, `VMUL` and `VADD`, and the servers `LD`, `SEND`, `VLD`, `VSEND`,
+  `VRECV` and `VST`;
+- its cost is lower than the cost of the groups. On a tie, keep the groups.
+
+Tiles and units are the ones of matmul, with the output rows `0 .. S-1`:
+chunks of `rho` rows and units `(chunk, s)`, `s = 0 .. S/W - 1`. PE `d` of
+the lane computes the segment `(chunk[d-1], j0 = s * W)`. A unit sends the
+image vectors `imagen[r * I + j0 + kj]` for `r = chunk[0] .. chunk[L-1] + K - 1`
+and `kj = 0 .. K - 1`: `(L + K - 1) * K` vectors.
+
+Cost, in exact cycles of the tables of skill 07:
+
+```text
+preload  (once per lane, before its first unit)   4 * K * K + Lp,  Lp = min(rho, PEs of the lane)
+pass     (one unit, L rows)                       5 * K * (L + K - 1) + 4 * L - 1
+```
+
+The assignment is the one of matmul, with `preload` in place of `load`: a
+lane pays it only before its first unit. Keep the `rho` with the lowest cost
+(on a tie, the smallest), and record `esquema` the same way.
+
+For convolucion with image 35 and kernel 4, and `W = 4` (cycles, tiling vs
+groups with the local kernel): 3x4 5377 vs 3925 (groups kept), 4x6 3490 vs
+3536, 5x7 2420 vs 2565, 2x10 2548 vs 4401, 8x8 1222 vs 1613, 6x10 1308 vs
+2021, 12x12 688 vs 1069, 32x32 298 vs 457.
+
+Reduccion has no tiling: every element is used once, and in the groups the
+server already works every cycle (`VLD`, `VSEND`, `VLD`, `VSEND`, `VST`,
+`VRECV`), so no lane could feed its PEs faster.
 
 ## Sizes That Do Not Match the Mesh
 
-- **Output larger than the compute block:** use multiple rounds. Only the
-  rectangular scalar border tile uses
-  `ceil(salida_filas / tile_filas) * ceil(salida_columnas / tile_columnas)`;
-  vector and eligible-list modes use their actual work-unit/worker counts.
-- **Edge tiles:** when the output is not a multiple of the block, the compute
-  PEs whose `global_fila` or `global_columna` falls outside the output have
-  nothing to calculate in that tile and emit NOP except when explicitly
-  relaying. Their shared server may serve another active PE; do not idle it
-  merely because one client has no work. Every output is assigned once.
-- **Mesh larger than the problem:** the extra compute PEs stay in `NOP`. In a
-  reduction, initialize a neutral scalar/vector partial if the PE joins the
-  reduction route. Otherwise leave it idle or use it only as a relay.
+- **Output larger than the groups:** each group takes several units, one after
+  another; the assignment balances them. There are no fixed tile rounds and
+  no edge tiles: every unit is assigned exactly once.
+- **Mesh larger than the problem:** groups without units stay in `NOP`. In
+  the border route, compute PEs with no work start with a neutral partial; the
+  gathering route only collects the groups that worked.
 
 ## Outputs
 
 ```text
-server of every compute PE      (memory PE and direction; west and east with 3 columns)
-work list per compute PE        (iterations, or output elements per tile)
-memory list per memory PE       (LD/ST it performs for its compute PEs)
-tile list                       (for matmul and convolucion; vector tiles,
-                                 and scalar tiles in vectorial mode, with the split n)
-communication edges             (operand delivery, results, reduction route)
+groups                          (local, pair or double; servers, compute PE, direction)
+unit list per group             (vector units first, then scalar units; the chosen n)
+memory list per memory PE       (LD/ST it performs for its compute PE)
+reduction route                 (border route or gathering route, root and output PE)
+esquema                         (grupos or tiling; with tiling: rho and the units of every lane)
 ```
 
 ## Notes

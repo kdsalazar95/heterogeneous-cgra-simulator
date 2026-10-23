@@ -21,7 +21,7 @@
 // Reduccion: c[i] = a[i] + b[i] y result = suma de c.
 // ---------------------------------------------------------------------------
 
-#define TAMANO_VECTOR 100
+#define TAMANO_VECTOR 3840
 
 static void inicializar_reduccion(float a[TAMANO_VECTOR], float b[TAMANO_VECTOR], float c[TAMANO_VECTOR],
                                   float *result) {
@@ -64,7 +64,7 @@ static void reduccion(void) {
 // Matmul: C = A x B. La matriz c se guarda en el banco "result".
 // ---------------------------------------------------------------------------
 
-#define TAMANO_MATRIZ 9 // Ajustar tamano para que coincida con el tamano de la matriz
+#define TAMANO_MATRIZ 32 // Ajustar tamano para que coincida con el tamano de la matriz
 
 static void inicializar_matmul(float a[TAMANO_MATRIZ][TAMANO_MATRIZ], float b[TAMANO_MATRIZ][TAMANO_MATRIZ],
                                float c[TAMANO_MATRIZ][TAMANO_MATRIZ]) {
@@ -107,7 +107,7 @@ static void matmul(void) {
 // La salida se guarda en el banco "result".
 // ---------------------------------------------------------------------------
 
-#define TAMANO_IMAGEN 12
+#define TAMANO_IMAGEN 35
 #define TAMANO_KERNEL 4
 
 #define TAMANO_SALIDA (TAMANO_IMAGEN - TAMANO_KERNEL + 1)

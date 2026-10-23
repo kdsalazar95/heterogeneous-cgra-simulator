@@ -81,7 +81,7 @@ instructions that file may contain.
 7. Keep explicit tile/phase and route records with the operation's generated
    manifest. Scalar and vector work sharing a C/G is ordered rather than
    duplicated in a cycle. Idle tile entries emit NOP unless the recorded plan
-   gives that PE relay, shared-server or reduction work. An unavailable
+   gives that PE relay or reduction work. An unavailable
    layout/route is an error, not a reason to publish an incomplete PE set.
 
 ## Outputs

@@ -1,15 +1,16 @@
 {
-  "descripcion": "Formato de la CGRA: tamaño de la malla, memoria, ancho de los vectores y tipos de PE. Las columnas de los bordes (oeste y este) son solo de memoria (M); en el resto las filas rotan escalar (E), vectorial (V) y cómputo (C), que es escalar y vectorial a la vez (fila 0 E, fila 1 V, fila 2 C, fila 3 E...). Si la malla no alcanza para E, V y C (menos de 3 filas o columnas), con 'adaptar_mallas_pequenas' el cómputo es solo C (1x1: G; Nx1: M arriba y C debajo; Nx2: M C; 1 o 2 filas: M C ... C M) sin cambiar este archivo; desde 3x3 se usa la rotación. Una 'malla' explícita manda sobre ambas. Lo leen run_cgra.py (src/formato_cgra.py) y los skills (agent_skills/01-receive-inputs.md).",
-  "filas": 3,
-  "columnas": 3,
-  "palabras_memoria": 4096,
+  "descripcion": "Formato de la CGRA: tamaño de la malla, memoria, ancho de los vectores y tipos de PE. Las columnas de los bordes (oeste y este) son solo de memoria (M); en el resto las filas rotan escalar (E), vectorial (V) y cómputo (C), que es escalar y vectorial a la vez (fila 0 E, fila 1 V, fila 2 C, fila 3 E...). Si la malla no alcanza para E, V y C (menos de 3 filas o columnas), con 'adaptar_mallas_pequenas' el cómputo es solo C (1x1: G; Nx1: M arriba y C debajo; Nx2: M C; 1 o 2 filas: M C ... C M) sin cambiar este archivo; desde 3x3 se usa la rotación. Una 'malla' explícita manda sobre ambas. Lo leen el simulador en C (c/src/configuracion.c) y los skills (agent_skills/01-receive-inputs.md). Cada PE tiene 16 registros escalares (r0..r15; rA, rB, rC, rT y acc son r0..r4) y, con 'palabras_locales', una memoria local propia (LDL/STL/VLDL/VSTL con local[i]); solo los M acceden a la memoria de datos (memoria.bin).",
+  "filas": 32,
+  "columnas": 32,
+  "palabras_memoria": 16384,
   "ancho_vector": 4,
+  "palabras_locales": 512,
   "adaptar_mallas_pequenas": true,
   "tipos_pe": {
     "G": {
       "nombre": "generico",
-      "descripcion": "Accede a memoria y realiza cálculo escalar y vectorial, una instrucción por ciclo. Permite ejecutar cargas, cálculos y almacenamiento en un único PE cuando la malla es 1x1.",
-      "instrucciones": ["NOP", "MOV", "LD", "ST", "ADD", "SUB", "MUL", "DIV", "SEND", "RECV", "VLD", "VST", "VADD", "VSUB", "VMUL", "VDIV", "VREDSUM", "VBCAST", "VSEND", "VRECV"]
+      "descripcion": "Accede a memoria y realiza cálculo escalar y vectorial, una instrucción por ciclo. Permite ejecutar cargas, cálculos y almacenamiento en un único PE cuando la malla es 1x1. Tiene memoria local.",
+      "instrucciones": ["NOP", "MOV", "LD", "ST", "ADD", "SUB", "MUL", "DIV", "SEND", "RECV", "VLD", "VST", "VADD", "VSUB", "VMUL", "VDIV", "VREDSUM", "VBCAST", "VSEND", "VRECV", "LDL", "STL", "VLDL", "VSTL"]
     },
     "M": {
       "nombre": "memoria",
@@ -18,25 +19,37 @@
     },
     "E": {
       "nombre": "escalar",
-      "descripcion": "Opera sobre registros escalares y envía/recibe escalares. No opera vectores ni accede a la memoria de datos.",
-      "instrucciones": ["NOP", "MOV", "ADD", "SUB", "MUL", "DIV", "SEND", "RECV"]
+      "descripcion": "Opera sobre registros escalares y envía/recibe escalares. No opera vectores ni accede a la memoria de datos. Guarda y lee escalares en su memoria local.",
+      "instrucciones": ["NOP", "MOV", "ADD", "SUB", "MUL", "DIV", "SEND", "RECV", "LDL", "STL"]
     },
     "V": {
       "nombre": "vectorial",
-      "descripcion": "Opera vectores carril a carril y envía/recibe vectores; envía/recibe escalares solo para VREDSUM y VBCAST. No hace aritmética escalar ni accede a la memoria de datos.",
-      "instrucciones": ["NOP", "MOV", "SEND", "RECV", "VADD", "VSUB", "VMUL", "VDIV", "VREDSUM", "VBCAST", "VSEND", "VRECV"]
+      "descripcion": "Opera vectores carril a carril y envía/recibe vectores; envía/recibe escalares solo para VREDSUM y VBCAST. No hace aritmética escalar ni accede a la memoria de datos. Guarda y lee escalares y vectores en su memoria local.",
+      "instrucciones": ["NOP", "MOV", "SEND", "RECV", "VADD", "VSUB", "VMUL", "VDIV", "VREDSUM", "VBCAST", "VSEND", "VRECV", "LDL", "STL", "VLDL", "VSTL"]
     },
     "C": {
       "nombre": "computo",
-      "descripcion": "Escalar y vectorial a la vez: opera registros escalares y vectores, y envía/recibe ambos. No accede a la memoria de datos.",
-      "instrucciones": ["NOP", "MOV", "ADD", "SUB", "MUL", "DIV", "SEND", "RECV", "VADD", "VSUB", "VMUL", "VDIV", "VREDSUM", "VBCAST", "VSEND", "VRECV"]
+      "descripcion": "Escalar y vectorial a la vez: opera registros escalares y vectores, y envía/recibe ambos. No accede a la memoria de datos. Guarda y lee escalares y vectores en su memoria local.",
+      "instrucciones": ["NOP", "MOV", "ADD", "SUB", "MUL", "DIV", "SEND", "RECV", "VADD", "VSUB", "VMUL", "VDIV", "VREDSUM", "VBCAST", "VSEND", "VRECV", "LDL", "STL", "VLDL", "VSTL"]
     }
   },
   "distribucion": {
     "ciclo_filas": [
-      {"oeste": "M", "este": "M", "resto": "E"},
-      {"oeste": "M", "este": "M", "resto": "V"},
-      {"oeste": "M", "este": "M", "resto": "C"}
+      {
+        "oeste": "M",
+        "este": "M",
+        "resto": "E"
+      },
+      {
+        "oeste": "M",
+        "este": "M",
+        "resto": "V"
+      },
+      {
+        "oeste": "M",
+        "este": "M",
+        "resto": "C"
+      }
     ]
   }
 }

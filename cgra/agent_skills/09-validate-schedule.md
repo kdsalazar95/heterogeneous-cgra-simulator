@@ -7,10 +7,9 @@ respect mesh communication.
 
 ## Checks
 
-Apply the [Mesh Compatibility Contract](mesh-compatibility.md), including its
-acceptance cases. The small-mesh layouts are resolved by the simulator's
-configuration loader; each generated program is still validated by loading it
-in the simulator, as below.
+Apply the [Mesh Compatibility Contract](mesh-compatibility.md). The small-mesh
+layouts are resolved by the simulator's configuration loader; each generated
+program is still validated by loading it in the simulator, as below.
 
 1. All `filas * columnas` PE files exist, one per PE of the mesh.
    Compare the complete set of generated `PE*.txt` filenames with the expected
@@ -26,7 +25,9 @@ in the simulator, as below.
    - `SEND north` matches neighbor `RECV south`
    - `SEND south` matches neighbor `RECV north`
 6. No diagonal communication is used, and no transfer leaves the mesh.
-7. Registers, scalar and vector, are defined before use.
+7. Registers, scalar and vector, are defined before use, and every
+   `LDL`/`VLDL` reads local words that the same PE wrote before with
+   `STL`/`VSTL` (the local memory starts at zero, with no data).
 8. Stores occur only after their source values are computed.
 9. All loop iterations are scheduled exactly once. In `vectorial` mode, every
    element is in exactly one block (or segment) or in the tail, never in both.
@@ -54,7 +55,7 @@ in the simulator, as below.
 16. Each output accumulator resets before reuse in a new tile, while input
     blocks of a reduction preserve their local sum. Shared C/G scalar/vector
     phases do not overlap. Validate partial final rounds and NOPs except for
-    required relays, shared-server or reduction work.
+    required relays or reduction work.
 17. The manifest, per-PE headers and the map of `c/build/cgra --mapa` agree. Report
     unsupported implementation paths and impossible hardware mappings
     accurately; never count a documentation-only policy as implemented support.

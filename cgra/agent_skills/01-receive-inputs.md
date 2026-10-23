@@ -99,9 +99,9 @@ size is an example):
    f mod 3 = 2:  M C C ... C M
 
    M (memoria):   NOP, MOV, LD, ST, VLD, VST, SEND, RECV, VSEND, VRECV  -> moves data, never computes
-   E (escalar):   NOP, MOV, ADD, SUB, MUL, DIV, SEND, RECV             -> scalar arithmetic only
+   E (escalar):   NOP, MOV, ADD, SUB, MUL, DIV, SEND, RECV, LDL, STL   -> scalar arithmetic only
    V (vectorial): NOP, MOV, SEND, RECV, VADD, VSUB, VMUL, VDIV,
-                  VREDSUM, VBCAST, VSEND, VRECV                        -> vector arithmetic only
+                  VREDSUM, VBCAST, VSEND, VRECV, LDL, STL, VLDL, VSTL  -> vector arithmetic only
    C (computo):   E + V                                                -> scalar and vector
    ```
 
@@ -118,7 +118,9 @@ size is an example):
    Use the compatible topology from the contract, including local execution
    for `1x1`. Do not impose two memory borders on a one- or two-column mesh.
 4. Read `palabras_memoria`: the size of the data memory, in words. The
-   `memoria.bin` of the program must fit in it.
+   `memoria.bin` of the program must fit in it. Read `palabras_locales`, if
+   present: the words of the local memory of every compute PE (`LDL`/`STL`,
+   `VLDL`/`VSTL`); the map printed above shows it in its last line.
 5. Decide the **mode** per operation. It is `vectorial` when the file has
    `ancho_vector` (`W`, the words of every vector register) **and** the map has
    compatible vector compute PEs (`V`, `C` or `G`) with valid local accesses or
@@ -233,11 +235,12 @@ The mesh and the problem do **not** have to match:
    every PE file and removes obsolete generated PE files.
 5. Record the mesh size and the type map read from `cgra.json`. Pass them to
    every later skill; do not hard-code a size or a type map downstream.
-6. Eligible compute PEs own work, including `G` when it also accesses memory.
-   Record explicit work lists and tile rounds. Only the standard rectangular
-   scalar border layout uses `tile_filas = filas`, `tile_columnas = columnas - 2`.
-   Other topologies use eligible-list tiling; never construct zero/negative
-   tile dimensions for narrow meshes.
+6. Only the compute PEs next to a server own work (the groups of skill 06,
+   [Workers](06-map-to-mesh.md#workers)), including a `G` that serves itself.
+   Record the groups and the units of each one; never construct
+   zero/negative tile dimensions for narrow meshes. Matmul and convolucion
+   may use the lanes of the local-memory tiling instead
+   ([skill 06](06-map-to-mesh.md#matmul-local-memory-tiling)).
 
 ## Outputs
 
@@ -267,12 +270,10 @@ vector_compute_pes=<PEs assigned vector work, row-major>
 scalar_only_pes=<eligible E-like PEs>
 scalar_capable_pes=<all eligible E/C/G-like PEs>
 scalar_compute_pes=<PEs assigned scalar work, with phases if shared with vectors>
-tile_filas=<positive int for rectangular scalar tiling, otherwise not applicable>
-tile_columnas=<positive int for rectangular scalar tiling, otherwise not applicable>
-tile_plan=<ordered work units, owner PE, scalar/vector phase and round>
-servers=<local PE or compatible memory PE(s) per selected compute PE>
-routes=<operand/result paths, scalar/vector transfer type, relay scratch registers>
-reduction_plan=<partial representation, combining root, paths; or local only>
+groups=<local, pair or double groups: servers, compute PE, direction to C>
+unit_plan=<n vector units; ordered units per group, vector phase then scalar phase>
+reduction_plan=<border route, gathering route (root and paths) or local>
+esquema=<grupos or tiling (matmul, convolucion); with tiling, rho and the units of every lane>
 output_pe=<actual compatible memory-capable output PE>
 modo=<escalar or vectorial>
 ancho_vector=<W from cgra.json, or none in escalar mode>
