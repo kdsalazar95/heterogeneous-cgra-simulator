@@ -3,6 +3,32 @@
 Pasos para compilar las operaciones con los skills y ejecutarlas en la CGRA.
 Todos los comandos se corren desde la raíz del repositorio.
 
+## Estructura del repositorio
+
+Lo que usa el simulador en C:
+
+```text
+heterogeneous-cgra-simulator/
+├── GUIA_USUARIO.md
+└── cgra/
+    ├── agent_skills/          skills que compilan las operaciones para la CGRA
+    ├── operaciones/
+    │   ├── operaciones.c      las operaciones (reduccion, matmul, convolucion)
+    │   └── memoria_cgra.h     formato de memoria.bin
+    ├── src/
+    │   └── cgra.json          formato de la CGRA: malla, memoria, tipos de PE
+    ├── programas/             programas compilados, uno por operación
+    │   └── <operacion>/
+    │       ├── memoria.bin
+    │       └── pe_instructions/PE{fila}{columna}.txt
+    └── c/                     simulador en C
+        ├── Makefile
+        ├── include/           cabeceras (.h)
+        ├── src/               código fuente (.c)
+        ├── scripts/perfilar.sh
+        └── build/cgra         el ejecutable, después de compilar
+```
+
 ## 1. Requisitos
 
 - **Visual Studio Code** con una **extensión de IA que funcione como agente**,
@@ -32,6 +58,47 @@ para la CGRA descrita en `cgra/src/cgra.json`.
 > Si cambias el tamaño de la malla u otro dato en `cgra/src/cgra.json`, vuelve
 > a pedirle al agente que ejecute los skills antes de correr la CGRA.
 
+### Usar los programas ya compilados (`programas_cgra.zip`)
+
+En vez de ejecutar los skills, puedes usar los programas ya compilados de
+`programas_cgra.zip`.
+
+**Descarga:** [programas_cgra.zip en Dropbox](https://www.dropbox.com/scl/fo/k70kfv62hty6inrjnu4ts/ADHb_MwMLBknXrxL34CIqWo?rlkey=n2rrxcr31nde0yhczw2dc4zpw&st=4x2zx51j&dl=0)
+
+1. Copia el zip a la **raíz del repositorio**, la carpeta
+   `heterogeneous-cgra-simulator/`, al mismo nivel que la carpeta `cgra/`:
+
+   ```text
+   heterogeneous-cgra-simulator/
+   ├── programas_cgra.zip     <- aquí
+   ├── GUIA_USUARIO.md
+   └── cgra/
+   ```
+
+2. Abre una terminal en esa carpeta y descomprímelo:
+
+   ```sh
+   cd heterogeneous-cgra-simulator
+   unzip -o programas_cgra.zip
+   ```
+
+   `-o` reemplaza los archivos que ya existan sin preguntar.
+
+No lo descomprimas dentro de `cgra/` ni en otra carpeta: dentro del zip los
+archivos ya empiezan con `cgra/`, así que quedarían en `cgra/cgra/...` y el
+simulador no los encontraría. Descomprimido en la raíz, cada archivo queda
+directamente en su lugar:
+
+| Archivo del zip | Va en |
+|---|---|
+| `cgra.json` | `cgra/src/` |
+| `operaciones.c` | `cgra/operaciones/` |
+| `memoria.bin` de cada operación | `cgra/programas/<operacion>/` |
+| `PE*.txt` de cada operación | `cgra/programas/<operacion>/pe_instructions/` |
+
+Los programas solo funcionan con el `cgra.json` del mismo zip: si lo cambias,
+hay que volver a ejecutar los skills.
+
 ## 3. Ejecutar la CGRA
 
 Compila el simulador (solo la primera vez o si cambia el código en `cgra/c/`):
@@ -59,7 +126,6 @@ Cada operación tiene su carpeta en `cgra/programas/<operacion>/`:
 | `pe_instructions/PE{fila}{columna}.txt` | Programa de cada PE | Skills |
 | `memoria.bin` | Memoria inicial con los datos de la operación | Skills |
 | `operaciones.ll`, `*.dot` | Código LLVM IR y grafos intermedios | Skills |
-| `validacion.json` | Resultado de la validación del programa | Skills |
 | `reporte_ciclos.txt` | Reporte de ciclos, instrucciones y accesos a memoria | Simulador |
 
 El binario del simulador queda en `cgra/c/build/cgra`.

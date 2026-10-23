@@ -47,8 +47,8 @@ array `c` is saved as `result`, and in `convolucion` `resultado` is saved as
 | `matmul` | `a`, `b`, `result` (`TAMANO_MATRIZ` x `TAMANO_MATRIZ`) |
 | `convolucion` | `imagen`, `kernel`, `result` (`TAMANO_SALIDA` x `TAMANO_SALIDA`) |
 
-The CGRA never generates or rewrites this memory by itself; `run_cgra.py` only
-loads it (and saves the results back with `--write-back`).
+The CGRA never generates or rewrites this memory by itself; the simulator
+(`c/build/cgra`) only loads it (and saves the results back with `--write-back`).
 
 ## Actions
 
