@@ -1,207 +1,472 @@
-#include "cgra.h"
-#include <stdlib.h>
-#include <string.h>
+/*
+ * Lectura y validación de los PE{fila}{columna}.txt, como Programa de
+ * src/programa.py, y el enlace de sus LD/ST con la memoria cargada, como
+ * Cargador de src/cargador.py.
+ *
+ * Todo lo que se puede resolver al cargar (registros, bancos, índices,
+ * direcciones) se resuelve aquí, para que el ciclo de ejecución nunca
+ * compare textos. Los mensajes de error son los de la versión en Python,
+ * en el mismo orden: leer todos los archivos, ciclos, comunicaciones,
+ * tipos de PE y enlace.
+ */
+
+#include "programa.h"
+
 #include <ctype.h>
 #include <errno.h>
-#include <limits.h>
-const char *opnames[OPS]=  {
-    "NOP","MOV","LD","ST","ADD","SUB","MUL","DIV","SEND","RECV","VLD","VST","VADD","VSUB","VMUL","VDIV","VREDSUM","VBCAST","VSEND","VRECV"
-};
-const char *dirs[4]=  {
-    "north","south","east","west"
-},*spanish[4]=  {
-    "norte","sur","este","oeste"
-},*regs[5]=  {
-    "rA","rB","rC","rT","acc"
-};
-int sending(Op o)  {
-    return o==SEND || o==VSEND;
-}
-int communicating(Op o)  {
-    return sending(o)||o==RECV||o==VRECV;
-}
-int memop(Op o)  {
-    return o==LD||o==ST||o==VLD||o==VST;
-}
-int arithmetic(Op o)  {
-    return o>=ADD&&o<=DIV;
-}
-int varithmetic(Op o)  {
-    return o>=VADD&&o<=VDIV;
-}
-Instruction *inst(Program *p,int pe,size_t t)  {
-    return &p->items[(size_t)pe*p->cycles+t];
-}
-static int reg(const char *s,int vector)  {
-    if(vector)  {
-        if(strlen(s)==2 && s[0]=='v' && s[1]>='0' && s[1]<='7')return s[1]-'0';
-        fail("Registro vectorial desconocido: %s",s);
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+
+#include "error.h"
+#include "texto.h"
+
+#define MAX_ERRORES_DE_TIPO 10
+
+// ---------------------------------------------------------------- IDs de PE
+
+static uint32_t digitos(uint32_t n) {
+    uint32_t d = 1;
+    while (n >= 10) {
+        n /= 10;
+        ++d;
     }
-    for(int i=0;i<5;i++)if(!strcmp(regs[i],s))return i;
-    fail("Registro desconocido: %s",s);
+    return d;
+}
+
+void generar_pe_id(char *id, const FormatoCGRA *formato, uint32_t pe) {
+    uint32_t mayor = formato->filas > formato->columnas ? formato->filas : formato->columnas;
+    int ancho = (int)digitos(mayor - 1);
+    snprintf(id, LARGO_PE_ID, "PE%0*u%0*u", ancho, pe / formato->columnas, ancho, pe % formato->columnas);
+}
+
+int64_t vecino(const FormatoCGRA *formato, uint32_t pe, Direccion dir) {
+    uint32_t fila = pe / formato->columnas, columna = pe % formato->columnas;
+    switch (dir) {
+    case NORTE: return fila > 0 ? (int64_t)pe - formato->columnas : -1;
+    case SUR:   return fila + 1 < formato->filas ? (int64_t)pe + formato->columnas : -1;
+    case OESTE: return columna > 0 ? (int64_t)pe - 1 : -1;
+    case ESTE:  return columna + 1 < formato->columnas ? (int64_t)pe + 1 : -1;
+    }
+    return -1;
+}
+
+// ------------------------------------------------------------------ lectura
+
+// Espacios de str.strip() de Python, en ASCII.
+static int es_espacio(unsigned char c) {
+    return isspace(c) || (c >= 0x1c && c <= 0x1f);
+}
+
+// Bytes del fin de línea que empieza en p, como str.splitlines(): \n, \r,
+// \r\n, \v, \f, \x1c-\x1e y, en UTF-8, U+0085, U+2028 y U+2029. 0 si no hay.
+static size_t fin_de_linea(const char *p) {
+    const unsigned char *c = (const unsigned char *)p;
+    if (c[0] == '\r' && c[1] == '\n') {
+        return 2;
+    }
+    if (strchr("\n\r\v\f\x1c\x1d\x1e", c[0]) && c[0]) {
+        return 1;
+    }
+    if (c[0] == 0xC2 && c[1] == 0x85) {
+        return 2;
+    }
+    if (c[0] == 0xE2 && c[1] == 0x80 && (c[2] == 0xA8 || c[2] == 0xA9)) {
+        return 3;
+    }
     return 0;
 }
-static void bank(Instruction *in,char *s,const char *origin)  {
-    char *p=strchr(s,'['),*e=strchr(s,']');
-    if(!p||!e||e[1]||p==s||e==p+1)fail("%s: memoria inválida '%s'",origin,s);
-    if(!isalpha((unsigned char)s[0])&&s[0]!='_')fail("%s: memoria inválida '%s'",origin,s);
-    for(char *k=s;k<p;k++)if(!isalnum((unsigned char)*k)&&*k!='_')fail("%s: memoria inválida '%s'",origin,s);
-    for(char *k=p+1;k<e;k++)if(!isdigit((unsigned char)*k))fail("%s: memoria inválida '%s'",origin,s);
-    *p=0;
-    *e=0;
-    in->bank=str(s);
-    errno=0;
-    unsigned long long idx=strtoull(p+1,NULL,10);
-    if(errno || idx>SIZE_MAX)fail("Índice de memoria fuera de rango");
-    in->index=(size_t)idx;
-}
-static Instruction parse(char *line,const char *origin)  {
-    Instruction in=  {
-        0
-    };
-    in.region=-1;
-    char *original=str(line),*save=NULL,*args[6];
-    int n=0;
-    for(char *p=line;*p;p++)if(*p==',')*p=' ';
-    for(char *s=strtok_r(line," \t\r\n",&save);s;s=strtok_r(NULL," \t\r\n",&save))  {
-        if(n==6)fail("%s: sintaxis no válida: '%s'",origin,original);
-        args[n++]=s;
+
+// Ruta de un archivo dentro de un directorio, como el operador / de Path.
+static char *unir_ruta(const char *directorio, const char *archivo) {
+    size_t largo = strlen(directorio) + strlen(archivo) + 2;
+    char *ruta = malloc(largo);
+    if (!ruta) {
+        return NULL;
     }
-    if(!n)fail("%s: instrucción vacía",origin);
-    for(char *p=args[0];*p;p++)*p=(char)toupper((unsigned char)*p);
-    int op=0;
-    while(op<OPS&&strcmp(opnames[op],args[0]))op++;
-    if(op==OPS)fail("%s: sintaxis no válida: '%s'",origin,original);
-    in.op=(Op)op;
-    int expected=op==NOP?1:arithmetic(in.op)||varithmetic(in.op)?4:3;
-    if(n!=expected)fail("%s: sintaxis no válida: '%s'",origin,original);
-    char *a=n>1?args[1]:NULL,*b=n>2?args[2]:NULL;
-    if(op==MOV)  {
-        in.dst=reg(a,0);
-        char *end;
-        errno=0;
-        in.imm=strtod(b,&end);
-        if(*end||end==b)fail("could not convert string to float: '%s'",b);
-        in.text=format("MOV %s, %s",a,number(in.imm));
-    } else if(op==LD||op==VLD)  {
-        in.dst=reg(a,op==VLD);
-        bank(&in,b,origin);
-        in.text=format("%s %s, %s[%zu]",opnames[op],a,in.bank,in.index);
-    } else if(op==ST||op==VST)  {
-        in.a=reg(b,op==VST);
-        bank(&in,a,origin);
-        in.text=format("%s %s[%zu], %s",opnames[op],in.bank,in.index,b);
-    } else if(arithmetic(in.op)||varithmetic(in.op))  {
-        int v=varithmetic(in.op);
-        in.dst=reg(a,v);
-        in.a=reg(b,v);
-        in.b=reg(args[3],v);
-        in.text=format("%s %s, %s, %s",opnames[op],a,b,args[3]);
-    } else if(communicating(in.op))  {
-        for(char *s=a;*s;s++)*s=(char)tolower((unsigned char)*s);
-        in.dir=0;
-        while(in.dir<4 && strcmp(a,dirs[in.dir]))in.dir++;
-        if(in.dir==4)fail("Dirección inválida: %s",a);
-        int vector=op==VSEND||op==VRECV;
-        if(sending(in.op))in.a=reg(b,vector);
-        else in.dst=reg(b,vector);
-        in.text=format("%s %s, %s",opnames[op],a,b);
-    } else if(op==VREDSUM||op==VBCAST)  {
-        in.dst=reg(a,op==VBCAST);
-        in.a=reg(b,op==VREDSUM);
-        in.text=format("%s %s, %s",opnames[op],a,b);
-    } else   {
-        in.text=str("NOP");
+    if (strcmp(directorio, ".") == 0) {
+        snprintf(ruta, largo, "%s", archivo);
+    } else if (strcmp(directorio, "/") == 0) {
+        snprintf(ruta, largo, "/%s", archivo);
+    } else {
+        snprintf(ruta, largo, "%s/%s", directorio, archivo);
     }
-    return in;
+    return ruta;
 }
-Program program_read(const char *path,Config *f)  {
-    Program p=  {
-        0
-    };
-    p.np=f->np;
-    Instruction **per=alloc((size_t)f->np,sizeof *per);
-    size_t *counts=alloc((size_t)f->np,sizeof *counts);
-    for(int pe=0;pe<f->np;pe++)  {
-        char *file=format("%s/%s.txt",path,peid(f,pe));
-        char *data=read_file(file,NULL),*line=data;
-        size_t cap=0;
-        unsigned char *seen=NULL;
-        int lineno=0;
-        while(line)  {
-            char *next=strchr(line,'\n');
-            if(next)*next++=0;
-            lineno++;
-            char *comment=strstr(line,"//");
-            if(comment)*comment=0;
-            char *s=trim(line);
-            if(*s)  {
-                char *q=s;
-                while(isdigit((unsigned char)*q))q++;
-                if(q==s||*q!=':')fail("%s, línea %d: se esperaba 'NN: INSTRUCCIÓN'",file,lineno);
-                *q=0;
-                errno=0;
-                unsigned long long t=strtoull(s,NULL,10);
-                if(errno||t>INT_MAX)fail("Ciclo fuera de rango");
-                if(t>=cap)  {
-                    size_t old=cap;
-                    cap=(size_t)t+1;
-                    seen=resize(seen,cap);
-                    memset(seen+old,0,cap-old);
-                    per[pe]=resize(per[pe],cap*sizeof **per);
-                }
-                if(seen[t])fail("%s, ciclo %llu: ciclo duplicado",file,t);
-                seen[t]=1;
-                per[pe][t]=parse(trim(q+1),format("%s, ciclo %llu",file,t));
+
+static int agregar(Leidas *leidas, const Instruccion *inst, uint64_t ciclo) {
+    if (leidas->cantidad == leidas->capacidad) {
+        size_t capacidad = leidas->capacidad ? 2 * leidas->capacidad : 1024;
+        Instruccion *instrucciones = realloc(leidas->instrucciones, capacidad * sizeof *instrucciones);
+        if (instrucciones) {
+            leidas->instrucciones = instrucciones;
+        }
+        uint64_t *ciclos = realloc(leidas->ciclos, capacidad * sizeof *ciclos);
+        if (ciclos) {
+            leidas->ciclos = ciclos;
+        }
+        if (!instrucciones || !ciclos) {
+            anotar_error("Sin memoria para cargar los programas");
+            return -1;
+        }
+        leidas->capacidad = capacidad;
+    }
+    leidas->instrucciones[leidas->cantidad] = *inst;
+    leidas->ciclos[leidas->cantidad++] = ciclo;
+    return 0;
+}
+
+// ¿Ya apareció este ciclo en el archivo? Los ciclos menores que la cantidad
+// de líneas van en un mapa de bits; los demás (raros) se buscan uno a uno.
+static int ciclo_repetido(const Leidas *leidas, uint8_t *vistos, size_t lineas, size_t inicio, uint64_t ciclo) {
+    if (ciclo < lineas) {
+        int visto = vistos[ciclo / 8] >> (ciclo % 8) & 1;
+        vistos[ciclo / 8] |= (uint8_t)(1u << (ciclo % 8));
+        return visto;
+    }
+    for (size_t i = inicio; i < leidas->cantidad; ++i) {
+        if (leidas->ciclos[i] == ciclo) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// Una línea ya sin comentario ni espacios: "NN: INSTRUCCIÓN".
+static int leer_linea(Leidas *leidas, const char *ruta, size_t numero_linea, char *linea,
+                      uint8_t *vistos, size_t lineas, size_t inicio) {
+    char *c = linea;
+    while (isdigit((unsigned char)*c)) {
+        ++c;
+    }
+    if (c == linea || *c != ':') {
+        anotar_error("%s, línea %zu: se esperaba 'NN: INSTRUCCIÓN'", ruta, numero_linea);
+        return -1;
+    }
+    *c++ = '\0';
+    while (es_espacio((unsigned char)*c)) {
+        ++c;
+    }
+    errno = 0;
+    uint64_t ciclo = strtoull(linea, NULL, 10);
+    if (errno == ERANGE) {
+        ciclo = UINT64_MAX;
+    }
+    if (ciclo_repetido(leidas, vistos, lineas, inicio, ciclo)) {
+        anotar_error("%s, ciclo %llu: ciclo duplicado", ruta, (unsigned long long)ciclo);
+        return -1;
+    }
+    char origen[strlen(ruta) + 32];
+    snprintf(origen, sizeof origen, "%s, ciclo %llu", ruta, (unsigned long long)ciclo);
+    Instruccion inst;
+    if (parsear_instruccion(c, origen, &inst) != 0) {
+        return -1;
+    }
+    if (agregar(leidas, &inst, ciclo) != 0) {
+        liberar_instruccion(&inst);
+        return -1;
+    }
+    return 0;
+}
+
+// Programa._leer_archivo(): una instrucción por línea; los comentarios
+// empiezan con //.
+static int leer_programa_pe(Leidas *leidas, const char *ruta) {
+    char *texto = leer_archivo(ruta, NULL);
+    if (!texto) {
+        anotar_error("%s: %s", ruta, strerror(errno));
+        return -1;
+    }
+    size_t lineas = 1;
+    for (const char *c = texto; *c; ++c) {
+        lineas += fin_de_linea(c) > 0;
+    }
+    uint8_t *vistos = calloc(lineas / 8 + 1, 1);
+    size_t inicio = leidas->cantidad;
+    int resultado = vistos ? 0 : -1;
+    if (!vistos) {
+        anotar_error("Sin memoria para cargar los programas");
+    }
+
+    char *linea = texto;
+    for (size_t numero_linea = 1; resultado == 0 && *linea; ++numero_linea) {
+        char *fin = linea;
+        while (*fin && !fin_de_linea(fin)) {
+            ++fin;
+        }
+        char *siguiente = fin + fin_de_linea(fin);
+        *fin = '\0';
+
+        char *comentario = strstr(linea, "//");
+        if (comentario) {
+            *comentario = '\0';
+        }
+        while (es_espacio((unsigned char)*linea)) {
+            ++linea;
+        }
+        char *ultimo = linea + strlen(linea);
+        while (ultimo > linea && es_espacio((unsigned char)ultimo[-1])) {
+            *--ultimo = '\0';
+        }
+        if (*linea) {
+            resultado = leer_linea(leidas, ruta, numero_linea, linea, vistos, lineas, inicio);
+        }
+        linea = siguiente;
+    }
+    if (resultado == 0 && leidas->cantidad == inicio) {
+        anotar_error("%s: programa vacío", ruta);
+        resultado = -1;
+    }
+    free(vistos);
+    free(texto);
+    return resultado;
+}
+
+int leer_programas(const char *directorio, const FormatoCGRA *formato, Programas *programas) {
+    memset(programas, 0, sizeof *programas);
+    Leidas *leidas = &programas->leidas;
+    programas->pes = cantidad_pes(formato);
+    leidas->inicio = calloc((size_t)programas->pes + 1, sizeof *leidas->inicio);
+    if (!leidas->inicio) {
+        anotar_error("Sin memoria para cargar los programas");
+        return -1;
+    }
+    for (uint32_t pe = 0; pe < programas->pes; ++pe) {
+        char id[LARGO_PE_ID], archivo[LARGO_PE_ID + 4];
+        generar_pe_id(id, formato, pe);
+        snprintf(archivo, sizeof archivo, "%s.txt", id);
+        char *ruta = unir_ruta(directorio, archivo);
+        if (!ruta) {
+            anotar_error("Sin memoria para cargar los programas");
+            return -1;
+        }
+        struct stat info;
+        int resultado = 0;
+        if (stat(ruta, &info) != 0 || !S_ISREG(info.st_mode)) {
+            anotar_error("No existe %s", ruta);
+            resultado = -1;
+        } else {
+            leidas->inicio[pe] = leidas->cantidad;
+            resultado = leer_programa_pe(leidas, ruta);
+        }
+        free(ruta);
+        if (resultado != 0) {
+            return -1;
+        }
+    }
+    leidas->inicio[programas->pes] = leidas->cantidad;
+    return 0;
+}
+
+// ---------------------------------------------------------------- validación
+
+// Todos los PEs deben tener los ciclos 0, 1, 2... del primero. Recién
+// entonces se pasan las instrucciones a por_pe, ubicadas por ciclo.
+static int ordenar_por_ciclo(Programas *programas, const FormatoCGRA *formato) {
+    Leidas *leidas = &programas->leidas;
+    size_t cantidad = leidas->inicio[1] - leidas->inicio[0];
+    uint64_t mayor = 0;
+    for (size_t i = leidas->inicio[0]; i < leidas->inicio[1]; ++i) {
+        mayor = leidas->ciclos[i] > mayor ? leidas->ciclos[i] : mayor;
+    }
+    // Los ciclos de un archivo son distintos entre sí, así que forman
+    // 0..mayor exactamente cuando hay mayor + 1 de ellos.
+    if (mayor + 1 != cantidad || cantidad > UINT32_MAX) {
+        anotar_error("Los ciclos deben comenzar en 0 y ser consecutivos");
+        return -1;
+    }
+    for (uint32_t pe = 1; pe < programas->pes; ++pe) {
+        int igual = leidas->inicio[pe + 1] - leidas->inicio[pe] == cantidad;
+        for (size_t i = leidas->inicio[pe]; igual && i < leidas->inicio[pe + 1]; ++i) {
+            igual = leidas->ciclos[i] < cantidad;
+        }
+        if (!igual) {
+            char id[LARGO_PE_ID];
+            generar_pe_id(id, formato, pe);
+            anotar_error("%s: rango de ciclos distinto al resto", id);
+            return -1;
+        }
+    }
+
+    size_t total = (size_t)programas->pes * cantidad;
+    programas->ciclos = (uint32_t)cantidad;
+    programas->por_pe = malloc((total ? total : 1) * sizeof *programas->por_pe);
+    programas->orden_archivo = malloc((total ? total : 1) * sizeof *programas->orden_archivo);
+    if (!programas->por_pe || !programas->orden_archivo) {
+        anotar_error("Sin memoria para cargar los programas");
+        return -1;
+    }
+    for (uint32_t pe = 0; pe < programas->pes; ++pe) {
+        for (size_t k = 0; k < cantidad; ++k) {
+            size_t i = leidas->inicio[pe] + k;
+            programas->por_pe[(size_t)pe * cantidad + leidas->ciclos[i]] = leidas->instrucciones[i];
+            programas->orden_archivo[(size_t)pe * cantidad + k] = (uint32_t)leidas->ciclos[i];
+        }
+    }
+    // Las instrucciones (y sus textos) ahora son de por_pe.
+    free(leidas->instrucciones);
+    free(leidas->ciclos);
+    free(leidas->inicio);
+    memset(leidas, 0, sizeof *leidas);
+    return 0;
+}
+
+// Cada SEND con el RECV opuesto del vecino en el mismo ciclo, y al revés;
+// lo mismo VSEND y VRECV.
+static int validar_comunicacion(const Programas *programas, const FormatoCGRA *formato) {
+    char pe_id[LARGO_PE_ID], otro_id[LARGO_PE_ID];
+    for (uint32_t ciclo = 0; ciclo < programas->ciclos; ++ciclo) {
+        for (uint32_t pe = 0; pe < programas->pes; ++pe) {
+            const Instruccion *inst = instruccion(programas, pe, ciclo);
+            if (!es_comunicacion(inst->op)) {
+                continue;
             }
-            line=next;
+            if (inst->dir == DIRECCION_INVALIDA) {
+                anotar_error("Dirección inválida: %s", inst->direccion_invalida);
+                return -1;
+            }
+            Direccion dir = (Direccion)inst->dir, opuesta = direccion_opuesta(dir);
+            int64_t otro = vecino(formato, pe, dir);
+            generar_pe_id(pe_id, formato, pe);
+            if (otro < 0) {
+                anotar_error("%s: no tiene vecino hacia %s", pe_id, DIRECCION_EN_INGLES[dir]);
+                return -1;
+            }
+            const Instruccion *companera = instruccion(programas, (uint32_t)otro, ciclo);
+            Opcode esperada = pareja(inst->op);
+            if (companera->op != esperada || companera->dir != (int8_t)opuesta) {
+                generar_pe_id(otro_id, formato, (uint32_t)otro);
+                anotar_error("Ciclo %u: %s %s %s no coincide con %s %s %s", ciclo, pe_id,
+                             NOMBRES_OPCODES[inst->op], DIRECCION_EN_INGLES[dir], otro_id,
+                             NOMBRES_OPCODES[esperada], DIRECCION_EN_INGLES[opuesta]);
+                return -1;
+            }
         }
-        if(!cap)fail("%s: programa vacío",file);
-        for(size_t t=0;t<cap;t++)if(!seen[t])fail(pe?"%s: rango de ciclos distinto al resto":"Los ciclos deben comenzar en 0 y ser consecutivos",peid(f,pe));
-        counts[pe]=cap;
-        if(!pe)p.cycles=cap;
-        else if(cap!=p.cycles)fail("%s: rango de ciclos distinto al resto",peid(f,pe));
     }
-    p.items=alloc(p.cycles*(size_t)f->np,sizeof *p.items);
-    for(int pe=0;pe<f->np;pe++)memcpy(inst(&p,pe,0),per[pe],counts[pe]*sizeof *p.items);
-    return p;
+    return 0;
 }
-void program_validate(Program *p,Config *f,Memory *m)  {
-    for(size_t t=0;t<p->cycles;t++)for(int pe=0;pe<f->np;pe++)  {
-        Instruction *i=inst(p,pe,t);
-        if(communicating(i->op))  {
-            int n=neighbor(f,pe,i->dir);
-            Instruction *j=inst(p,n,t);
-            Op match=i->op==SEND?RECV:i->op==RECV?SEND:i->op==VSEND?VRECV:VSEND;
-            if(j->op!=match||j->dir!=(i->dir^1))fail("Ciclo %zu: %s %s %s no coincide con %s %s %s",t,peid(f,pe),opnames[i->op],dirs[i->dir],peid(f,n),opnames[match],dirs[i->dir^1]);
+
+// validar_tipos(): cada instrucción debe estar entre las de su tipo de PE.
+// Se informan las primeras 10 y cuántas más hay.
+static int validar_tipos(const Programas *programas, const FormatoCGRA *formato) {
+    Texto detalle = {0};
+    size_t errores = 0;
+    char id[LARGO_PE_ID];
+    for (uint32_t pe = 0; pe < programas->pes; ++pe) {
+        const TipoPE *tipo = tipo_del_pe(formato, pe);
+        for (uint32_t ciclo = 0; ciclo < programas->ciclos; ++ciclo) {
+            Opcode op = instruccion(programas, pe, ciclo)->op;
+            if (tipo->permitidas >> op & 1) {
+                continue;
+            }
+            if (++errores <= MAX_ERRORES_DE_TIPO) {
+                generar_pe_id(id, formato, pe);
+                agregar_texto(&detalle, "%s%s (%s), ciclo %u: %s no está permitido", errores > 1 ? "\n  " : "",
+                              id, tipo->nombre, ciclo, NOMBRES_OPCODES[op]);
+            }
         }
     }
-    int errors=0;
-    char *details=str("");
-    for(int pe=0;pe<f->np;pe++)for(size_t t=0;t<p->cycles;t++)  {
-        Instruction *i=inst(p,pe,t);
-        Type *ty=&f->types[f->map[pe]];
-        if(!(ty->mask&(1u<<i->op)))  {
-            errors++;
-            if(errors<=10)details=format("%s%s%s (%s), ciclo %zu: %s no está permitido",details,errors==1?"":"\n  ",peid(f,pe),ty->name,t,opnames[i->op]);
+    if (errores && !detalle.error) {
+        if (errores > MAX_ERRORES_DE_TIPO) {
+            agregar_texto(&detalle, "\n  ... y %zu más", errores - MAX_ERRORES_DE_TIPO);
+        }
+        anotar_error("%zu instrucciones no respetan el tipo de su PE:\n  %s", errores,
+                     detalle.datos ? detalle.datos : "");
+    } else if (detalle.error) {
+        anotar_error("Sin memoria para validar los programas");
+    }
+    liberar_texto(&detalle);
+    return errores || detalle.error ? -1 : 0;
+}
+
+// Programa.enlazar(): banco[indice] pasa a ser la dirección de banco +
+// indice en la memoria plana. Un VLD/VST usa ancho_vector palabras desde
+// ahí, y todas deben caber en la región. Recorre las instrucciones en el
+// orden de cada archivo, como Python.
+static int enlazar(Programas *programas, const FormatoCGRA *formato, const Memoria *memoria) {
+    char id[LARGO_PE_ID];
+    for (uint32_t pe = 0; pe < programas->pes; ++pe) {
+        for (uint32_t k = 0; k < programas->ciclos; ++k) {
+            uint32_t ciclo = programas->orden_archivo[(size_t)pe * programas->ciclos + k];
+            Instruccion *inst = &programas->por_pe[(size_t)pe * programas->ciclos + ciclo];
+            if (!es_memoria(inst->op)) {
+                continue;
+            }
+            generar_pe_id(id, formato, pe);
+            uint64_t palabras = inst->op == OP_VLD || inst->op == OP_VST ? formato->ancho_vector : 1;
+            if (palabras == 0) {
+                anotar_error("%s, ciclo %u: %s necesita 'ancho_vector' en cgra.json", id, ciclo,
+                             NOMBRES_OPCODES[inst->op]);
+                return -1;
+            }
+            int region = buscar_region(memoria, inst->banco);
+            if (region < 0) {
+                anotar_error("%s, ciclo %u: la región '%s' no está en la memoria cargada", id, ciclo, inst->banco);
+                return -1;
+            }
+            const Region *r = &memoria->regiones[region];
+            uint64_t tamano = tamano_region(r);
+            if (inst->indice > tamano || palabras > tamano - inst->indice) {
+                char ocupa[LARGO_NOMBRE_REGION + 64];
+                if (palabras == 1) {
+                    snprintf(ocupa, sizeof ocupa, "%s[%llu]", inst->banco, (unsigned long long)inst->indice);
+                } else {
+                    snprintf(ocupa, sizeof ocupa, "%s[%llu..%llu]", inst->banco, (unsigned long long)inst->indice,
+                             (unsigned long long)(inst->indice + palabras - 1));
+                }
+                anotar_error("%s, ciclo %u: %s se sale de la región (%llu palabras)", id, ciclo, ocupa,
+                             (unsigned long long)tamano);
+                return -1;
+            }
+            inst->region = region;
+            inst->direccion = r->direccion + inst->indice;
         }
     }
-    if(errors)fail("%d instrucciones no respetan el tipo de su PE:\n  %s%s",errors,details,errors>10?format("\n  ... y %d más",errors-10):"");
-    for(int pe=0;pe<f->np;pe++)for(size_t t=0;t<p->cycles;t++)  {
-        Instruction *i=inst(p,pe,t);
-        if(!memop(i->op))continue;
-        int words=(i->op==VLD||i->op==VST)?f->width:1;
-        if(!words)fail("%s, ciclo %zu: %s necesita 'ancho_vector' en cgra.json",peid(f,pe),t,opnames[i->op]);
-        int r=0;
-        while(r<m->count && strcmp(m->regions[r].name,i->bank))r++;
-        if(r==m->count)fail("%s, ciclo %zu: la región '%s' no está en la memoria cargada",peid(f,pe),t,i->bank);
-        Region *regn=&m->regions[r];
-        size_t size=(size_t)regn->rows*regn->cols;
-        if(i->index>size || (size_t)words>size-i->index)  {
-            char *range=words==1?format("%s[%zu]",i->bank,i->index):format("%s[%zu..%zu]",i->bank,i->index,i->index+(size_t)words-1);
-            fail("%s, ciclo %zu: %s se sale de la región (%zu palabras)",peid(f,pe),t,range,size);
+    return 0;
+}
+
+// Un registro que no existe: Python lo descubre al ejecutar esa
+// instrucción, así que se busca en el orden de ejecución (por ciclo,
+// primero los envíos y después el resto).
+static int validar_registros(const Programas *programas, const FormatoCGRA *formato) {
+    char id[LARGO_PE_ID];
+    for (uint32_t ciclo = 0; ciclo < programas->ciclos; ++ciclo) {
+        for (int pasada = 0; pasada < 2; ++pasada) {
+            for (uint32_t pe = 0; pe < programas->pes; ++pe) {
+                const Instruccion *inst = instruccion(programas, pe, ciclo);
+                if (es_envio(inst->op) != (pasada == 0) || !inst->registro_invalido) {
+                    continue;
+                }
+                generar_pe_id(id, formato, pe);
+                anotar_error("%s, ciclo %u: %s", id, ciclo, inst->registro_invalido);
+                return ERROR_EJECUCION;
+            }
         }
-        i->region=r;
-        i->addr=regn->addr+i->index;
     }
+    return 0;
+}
+
+int validar_programas(Programas *programas, const FormatoCGRA *formato, Memoria *memoria) {
+    if (ordenar_por_ciclo(programas, formato) != 0 || validar_comunicacion(programas, formato) != 0
+        || validar_tipos(programas, formato) != 0 || enlazar(programas, formato, memoria) != 0) {
+        return -1;
+    }
+    return validar_registros(programas, formato);
+}
+
+void liberar_programas(Programas *programas) {
+    Leidas *leidas = &programas->leidas;
+    for (size_t i = 0; i < leidas->cantidad; ++i) {
+        liberar_instruccion(&leidas->instrucciones[i]);
+    }
+    free(leidas->instrucciones);
+    free(leidas->ciclos);
+    free(leidas->inicio);
+    for (size_t i = 0; programas->por_pe && i < (size_t)programas->pes * programas->ciclos; ++i) {
+        liberar_instruccion(&programas->por_pe[i]);
+    }
+    free(programas->por_pe);
+    free(programas->orden_archivo);
+    memset(programas, 0, sizeof *programas);
 }
