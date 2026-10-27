@@ -18,26 +18,42 @@ The pipeline is the compiler. It turns the source into one program per PE
 `programas/<operacion>/memoria.bin` (skill 02). The simulator only loads those two
 things and executes them.
 
-The mesh and the problem do not have to be the same size: a larger problem is
-processed in tiles of the compute block, and a larger mesh leaves its extra PEs
+Scheduling improvements belong to this compiler, not to the simulator's
+execution core. Compare complete schedules globally while preserving tile
+membership, contiguous blocks and their assignment in rounds (skill 06,
+[Global Selection Within Fixed Tiles](06-map-to-mesh.md#global-selection-within-fixed-tiles)).
+
+When the user asks the agent to arrange PE types for a mesh size, skill 01
+handles [PE placement](01-receive-inputs.md#designing-pe-placement-when-requested)
+using skill 06's [layout and tile rules](06-map-to-mesh.md#layout-and-tile-design).
+Preserve the hardware inventory, keep M servers on the west/east borders
+where the shape permits, and select one feasible hardware map for all
+operations before compilation. Ordinary compilation reads the existing map;
+it does not redesign it. Editing these skills alone does not change
+`src/cgra.json` or regenerate programs.
+
+The mesh and the problem do not have to be the same size: the mesh is split
+into tiles (sections of rows that work as small CGRAs) and a larger problem
+is split into blocks handed out to them in rounds (skill 06, Tiles and
+Tiling), and a larger mesh leaves its extra PEs
 in `NOP`. The size is not fixed: every skill builds the CGRA from
 `src/cgra.json`.
 
 ## Pipeline
 
-Apply the [Mesh Compatibility Contract](mesh-compatibility.md) throughout the
-pipeline. It defines automatic small layouts (singleton G, vertical M/C,
-two-column M C, and one/two-row meshes with M at both ends and C interiors),
-capability checks, compatible routes, scalar remainders
-and tiling. The simulator's configuration loader (`c/src/configuracion.c`)
-resolves the small layouts when `src/cgra.json`
-has `"adaptar_mallas_pequenas": true`, and skill 07 has their schedules: a
-small mesh is never a reason to stop. Always use the actual simulator map. An
+Every mesh size is valid. The small layouts (singleton G, vertical M/C,
+two-column M C, and one/two-row meshes with M at both ends and C interiors)
+are in skill 01 ([Small Meshes](01-receive-inputs.md#small-meshes)); the
+capability checks and scalar remainders in skill 05
+([Feasibility](05-detect-parallelism.md#feasibility)); the routes and tiling
+in skill 06. The simulator's configuration loader (`c/src/configuracion.c`)
+resolves the small layouts when `src/cgra.json` has
+`"adaptar_mallas_pequenas": true`, and skill 07 has their schedules: a small
+mesh is never a reason to stop. Always use the actual simulator map. An
 existing explicit map or concrete distribution must never be silently changed.
-
-The exceptions apply in that order. Thus 2x3 is two M C M rows; 1x4 and
-2x4 use M C C M rows. Normal meshes with at least 3 rows and 3 columns keep
-the original E/V/C row rotation and scheduling instructions.
+Under the current default distribution, meshes with at least 3 rows and
+3 columns keep the E/V/C row rotation. An authorized design through skills
+01 and 06 may select another validated placement before compilation.
 
 Existing files in `programas/<operacion>/` are generated outputs, not inputs
 that prevent compilation. On every invocation, rebuild the IR, graphs, initial
@@ -47,6 +63,9 @@ memory and all PE instruction files from the current C source and
 width or memory capacity requires recompilation and validation; do not stop
 because the old program targets different hardware. The simulator loads and
 executes these outputs; it does not run this compilation pipeline automatically.
+Before writing an operation, apply the backup/restore procedure in skill 01
+([All Operations](01-receive-inputs.md#all-operations)) so compilation or
+validation failures preserve its previous contents.
 
 The pipeline always compiles **all the operations** of the `OPERACIONES` table,
 never only one. Skill 01 reads the CGRA once and builds the list of operations;
@@ -74,6 +93,7 @@ code changes); every command below runs from `cgra/`:
 make -C c                          # builds c/build/cgra
 c/build/cgra --mapa                # mesh, PE type map and legend of src/cgra.json (skill 01)
 c/build/cgra <operacion>           # loads, validates and runs a compiled program (skill 09)
+c/build/cgra todas                 # validates and runs every program; exit 1 if any fails (skill 09)
 ```
 
 ## Default Commands
@@ -92,7 +112,7 @@ opt-18 -passes=dot-ddg -disable-output operaciones.ll
 One `PE{fila}{columna}` per position, connected only to its north, south, east,
 and west neighbors. In the standard border layout the west and east columns
 are **memory PEs** (`M`) and the interior PEs compute. Small and explicit
-layouts follow the compatibility contract. The specialized types are:
+layouts follow skill 01. The specialized types are:
 
 ```text
 M = memoria    the west and east columns; loads/stores scalars and vectors, never computes
@@ -119,7 +139,7 @@ exceptions. A generic PE can fulfill both memory and compute roles locally.
 When the mesh cannot hold E, V and C (fewer than 3 rows or columns), only C is
 used for compute: `"adaptar_mallas_pequenas": true` in `src/cgra.json` makes
 the simulator generate that layout for any size (see
-[the contract](mesh-compatibility.md#when-e-v-and-c-cannot-all-be-used)).
+[Small Meshes](01-receive-inputs.md#small-meshes)).
 
 ## Instruction Set per PE Type
 
@@ -150,8 +170,9 @@ G combines the memory and compute instruction permissions actually configured
 for it. With no vector width it uses only the scalar ISA. Never infer G's
 permissions just from the letter; read its declared or implicit generic type.
 
-When `src/cgra.json` has `ancho_vector` (`W`) and vector compute PEs (`V` or
-`C`), the pipeline runs in `vectorial` mode (skill 01): the vector compute PEs
+When `src/cgra.json` has `ancho_vector` (`W`), compatible vector groups and
+a complete implemented vector plan, the pipeline can select `vectorial` mode
+(skill 01); local G groups use scalar work. In vectorial mode: the vector compute PEs
 do the work in blocks of `W` contiguous elements, and the scalar compute PEs
 (`E`) do, at the same time, what does not fill a block, with the scalar
 instructions above. The vector instructions are:
