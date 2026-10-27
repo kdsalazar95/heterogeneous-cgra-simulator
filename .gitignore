@@ -32,6 +32,12 @@ graphs/
 # C simulator artifacts
 cgra/c/build/
 cgra/c/perfilado/
+cgra/agent_skills_c/
+
+# Herramientas auxiliares locales de perfilado y validación
+cgra/c/scripts/analizar_perfil.py
+cgra/c/scripts/perfilar.py
+cgra/c/test/equivalence.py
 
 # Simulador en Python: solo local, el repo usa la versión en C
 cgra/src/*.py

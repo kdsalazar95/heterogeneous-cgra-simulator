@@ -490,9 +490,11 @@ static int leer_operaciones(Lineas *nombres) {
 
 // Corre todas las operaciones, cada una con su memoria y sus programas en
 // programas/<operacion>/. Si una falla se anota el error y se sigue con la
-// siguiente; al final se muestra una línea por operación.
+// siguiente; al final se muestra una línea por operación. Termina con 1 si
+// alguna falló, para que validar todas detecte el error.
 static int correr_todas(const Argumentos *a) {
     Lineas operaciones = {0}, resumen = {0};
+    int fallidas = 0;
     int resultado = leer_operaciones(&operaciones);
     for (size_t i = 0; i < operaciones.cantidad && resultado == 0; ++i) {
         const char *operacion = operaciones.lineas[i];
@@ -506,6 +508,7 @@ static int correr_todas(const Argumentos *a) {
         } else if (corrida == -1) {
             printf("  %s\n", ultimo_error());
             agregar_linea(&resumen, "%-12s error  %s", operacion, ultimo_error());
+            ++fallidas;
         } else {
             resultado = corrida;
         }
@@ -519,7 +522,7 @@ static int correr_todas(const Argumentos *a) {
     }
     liberar_lineas(&operaciones);
     liberar_lineas(&resumen);
-    return resultado == 0 ? 0 : 1;
+    return resultado == 0 && fallidas == 0 ? 0 : 1;
 }
 
 // --mapa: el hardware para el que los skills compilan, sin cargar nada más.

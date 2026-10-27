@@ -10,6 +10,8 @@ Lo que usa el simulador en C:
 ```text
 heterogeneous-cgra-simulator/
 ├── GUIA_USUARIO.md
+├── Programas_PEs/             programas de los PEs ya compilados, un zip por malla
+│   └── pe_programas_<filas>x<columnas>.zip
 └── cgra/
     ├── agent_skills/          skills que compilan las operaciones para la CGRA
     ├── operaciones/
@@ -58,46 +60,64 @@ para la CGRA descrita en `cgra/src/cgra.json`.
 > Si cambias el tamaño de la malla u otro dato en `cgra/src/cgra.json`, vuelve
 > a pedirle al agente que ejecute los skills antes de correr la CGRA.
 
-### Usar los programas ya compilados (`programas_cgra.zip`)
+### Usar los programas ya compilados (`Programas_PEs/`)
 
-En vez de ejecutar los skills, puedes usar los programas ya compilados de
-`programas_cgra.zip`.
+En vez de ejecutar los skills, puedes usar los programas de los PEs ya
+compilados. Están en la carpeta `Programas_PEs/`, en la raíz del repositorio,
+con un zip por tamaño de malla:
 
-**Descarga:** [programas_cgra.zip en Dropbox](https://www.dropbox.com/scl/fo/k70kfv62hty6inrjnu4ts/ADHb_MwMLBknXrxL34CIqWo?rlkey=n2rrxcr31nde0yhczw2dc4zpw&st=4x2zx51j&dl=0)
+```text
+heterogeneous-cgra-simulator/
+├── Programas_PEs/
+│   ├── pe_programas_4x4.zip
+│   ├── pe_programas_6x8.zip
+│   ├── pe_programas_12x12.zip
+│   ├── pe_programas_12x16.zip
+│   ├── pe_programas_24x24.zip
+│   └── pe_programas_32x32.zip
+└── cgra/
+```
 
-1. Copia el zip a la **raíz del repositorio**, la carpeta
-   `heterogeneous-cgra-simulator/`, al mismo nivel que la carpeta `cgra/`:
+El nombre indica la malla: `pe_programas_<filas>x<columnas>.zip`. Cada zip
+trae los `PE*.txt` de las tres operaciones (`reduccion`, `matmul` y
+`convolucion`), en `programas/<operacion>/pe_instructions/`.
 
-   ```text
-   heterogeneous-cgra-simulator/
-   ├── programas_cgra.zip     <- aquí
-   ├── GUIA_USUARIO.md
-   └── cgra/
+1. Escoge el zip de la malla que vas a usar, por ejemplo
+   `pe_programas_12x16.zip`.
+
+2. En `cgra/src/cgra.json`, pon las **filas y columnas de esa malla**. Si no
+   coinciden con el zip, el simulador no puede cargar los programas:
+
+   ```json
+   "filas": 12,
+   "columnas": 16,
    ```
 
-2. Abre una terminal en esa carpeta y descomprímelo:
+   No cambies los demás datos del JSON.
+
+3. Borra los programas de los PEs que ya estén en `cgra/programas/`, para que
+   no queden archivos de otra malla mezclados con los nuevos:
 
    ```sh
-   cd heterogeneous-cgra-simulator
-   unzip -o programas_cgra.zip
+   rm -rf cgra/programas/*/pe_instructions
+   ```
+
+4. Descomprime el zip **dentro de `cgra/`** (no en la raíz): dentro del zip
+   los archivos empiezan con `programas/`, así que quedan en
+   `cgra/programas/<operacion>/pe_instructions/`:
+
+   ```sh
+   unzip -o Programas_PEs/pe_programas_12x16.zip -d cgra
    ```
 
    `-o` reemplaza los archivos que ya existan sin preguntar.
 
-No lo descomprimas dentro de `cgra/` ni en otra carpeta: dentro del zip los
-archivos ya empiezan con `cgra/`, así que quedarían en `cgra/cgra/...` y el
-simulador no los encontraría. Descomprimido en la raíz, cada archivo queda
-directamente en su lugar:
+5. Ejecuta la CGRA como en la sección 3. Cada operación usa el `memoria.bin`
+   que ya está en `cgra/programas/<operacion>/`.
 
-| Archivo del zip | Va en |
-|---|---|
-| `cgra.json` | `cgra/src/` |
-| `operaciones.c` | `cgra/operaciones/` |
-| `memoria.bin` de cada operación | `cgra/programas/<operacion>/` |
-| `PE*.txt` de cada operación | `cgra/programas/<operacion>/pe_instructions/` |
-
-Los programas solo funcionan con el `cgra.json` del mismo zip: si lo cambias,
-hay que volver a ejecutar los skills.
+`pe_programas_32x32.zip` tiene otro formato: trae su propio `cgra.json`, los
+`memoria.bin` y un `LEEME.txt`, todo dentro de `programas_32x32/`. Ese no se
+descomprime en `cgra/`. Sigue las instrucciones de su `LEEME.txt`.
 
 ## 3. Ejecutar la CGRA
 
@@ -113,6 +133,10 @@ Ejecuta todas las operaciones o solo una:
 cgra/c/build/cgra todas
 cgra/c/build/cgra matmul
 ```
+
+`todas` carga, valida y ejecuta todos los programas, sigue aunque uno falle y
+termina con un resumen de una línea por operación. Su código de salida es 0
+solo si todas pasaron, y 1 si alguna falló.
 
 Opciones útiles: `--ciclos` muestra los ciclos de cómputo y de comunicación, y
 `--traza` muestra lo que hace cada PE en cada ciclo.
