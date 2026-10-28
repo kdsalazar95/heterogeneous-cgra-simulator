@@ -5,6 +5,18 @@
 Determine which operations can execute independently across the PEs of the mesh
 and which must be reduced or serialized.
  
+## Specialized Compute First
+
+Apply the [specialized-first policy](06-map-to-mesh.md#specialized-first-policy)
+before distributing work. Large physical meshes (at least 3 rows and 3
+columns) must have only M borders and E/V compute PEs; C is forbidden,
+including as a fallback. Scalar arithmetic uses E and vector arithmetic V.
+Busy specialists execute further work sequentially. Check routes, storage,
+scalar tails and reductions; report infeasibility instead of introducing C.
+C is reserved for the small physical layouts of skill 01, not small tiles
+inside a large mesh. Record small-layout C work in `compute_fallbacks`.
+Instruction permissions remain authoritative.
+
 ## Feasibility
  
 Determine feasibility per operation and per work unit before distributing

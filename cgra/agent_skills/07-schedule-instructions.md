@@ -89,6 +89,16 @@ load the program and reports the PE and cycle.
 6. Preserve operation dependencies from the DDG.
 7. For local accumulation, accumulate in the compute PE before starting the
    reduction across the mesh.
+8. Enforce the [Specialized-First Policy](06-map-to-mesh.md#specialized-first-policy)
+   in every template below. E handles scalar work and V vector work whenever
+   feasible, even if this requires additional passes. Large physical meshes
+   must contain no type C PE, even for relays. Only small layouts may emit arithmetic,
+   VREDSUM or VBCAST on a type C PE only for the work justified in
+   `compute_fallbacks`; do not activate C to shorten the schedule. Required
+   C relays and operand staging are allowed; otherwise emit NOP. The letter
+   C used as a compute-role label in the tables does not authorize type C
+   arithmetic. Do not initialize unused C accumulators or include idle C in
+   reductions merely because a template shows every compute PE participating.
 
 ## Local Execution: 1x1 G
 

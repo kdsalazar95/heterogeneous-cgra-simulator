@@ -42,6 +42,25 @@ from the map printed by the simulator. Its keys mean:
  
 1. Read `filas` and `columnas`: the mesh size (`filas x columnas`). Whatever
    numbers they hold are the mesh for this run; never assume a size.
+   Apply the requested standard hardware policy before reading the effective
+   map: for at least 3 rows AND 3 columns, replace the old E/V/C rotation
+   with `distribucion.ciclo_filas` containing exactly these two rules:
+
+   ```json
+   [{"oeste": "M", "este": "M", "resto": "E"},
+    {"oeste": "M", "este": "M", "resto": "V"}]
+   ```
+
+   Back up the configuration and generated programs before this migration.
+   Update its description too. If an old explicit `malla` overrides the rule,
+   migrate that map to the same M borders and alternating E/V interiors;
+   preserve explicit user hardware constraints and report conflicts. Validate
+   with `--cgra <selected.json> --mapa`, then use that exact configuration for
+   every operation, simulator and profiling run. Never claim the new layout
+   while executing the previous JSON. Keep `tipos_pe.C` available for small
+   layouts; declaring a type does not place it. Regenerate existing PE files
+   after a layout change. Small dimensions retain the existing adaptations.
+
 2. Get the type of every `PE{fila}{columna}`. The file gives it as a rule,
    `distribucion`, so the mesh follows `filas` and `columnas` without being
    rewritten: a PE on the `oeste`/`este`/`norte`/`sur` border takes that
@@ -76,8 +95,8 @@ from the map printed by the simulator. Its keys mean:
    which only executes instructions and never touches memory. A compute PE is
    **scalar** if its type has `ADD`..`DIV`, **vector** if it has
    `VADD`..`VBCAST`, or both. With `ciclo_filas` of `R` rules, row `f` takes
-   rule `f mod R`; the file of this project rotates `escalar`, `vectorial`,
-   `computo` (`R = 3`), but read `R` and the rules from the file:
+   rule `f mod R`; the selected large layout alternates `escalar`,
+   `vectorial` (`R = 2`). Read the actual rules and reject a stale C rotation:
  
 ```text
    memory PEs:   PE(f, 0) and PE(f, columnas - 1), for every row f
@@ -207,7 +226,7 @@ explicit `malla` always takes precedence.
 | `Nx1`, `N >= 2` | `M` at row 0, `C` at rows 1 to N-1 | vertical memory server |
 | `Nx2`, `N >= 1` | each row is `M C` | one horizontal server/compute pair per row |
 | 1 or 2 rows, at least 3 columns | west/east `M`; every interior PE is `C` | two servers per row with 3 columns; border pairs with more |
-| at least 3 rows and at least 3 columns | west/east `M`; interior rows cycle `E`, `V`, `C` | standard border layout |
+| at least 3 rows and at least 3 columns | west/east `M`; interior rows alternate `E`, `V` after the policy migration | standard border layout |
  
 Dimensions are always rows x columns, and the one- and two-column cases go
 before the row-count cases. So 1x3 is `M C M`, 2x3 has two `M C M` rows (never
@@ -215,13 +234,12 @@ before the row-count cases. So 1x3 is `M C M`, 2x3 has two `M C M` rows (never
 M/C) and 1x1 (G) have no east memory column. Transposing a shape can change
 its layout: 1x3 and 3x1 have different servers and routes.
  
-The E/V/C rotation needs at least 3 compute rows to contain all three types.
-With fewer rows or columns it would leave the mesh without V or C PEs (1x3
-would be `M E M`, scalar only; 2x3 `M E M` / `M V M`, with no PE that has
-both), so every compute position of the small layouts is **C**, which is E + V.
-G is used only where memory and compute are needed in the same PE, the 1x1.
-No new instructions are implied.
- 
+The small-layout cutoff remains the project's existing convention: fewer
+than 3 rows or columns uses C (E + V), with G only for 1x1. This is a
+conservative topology rule, not a claim that two distinct types can never fit
+geometrically in 2x3. From 3x3 onward use only E/V compute positions, and
+never reintroduce C for a small tile or a difficult operation.
+
 If the key is missing or false and the printed map of a small mesh has E or V
 compute PEs, do not rewrite `cgra.json`: compile for the actual map (scalar on
 E, vector on V) and note in the mesh summary that the key enables the C layout.
