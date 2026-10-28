@@ -52,8 +52,8 @@ resolves the small layouts when `src/cgra.json` has
 mesh is never a reason to stop. Always use the actual simulator map. An
 existing explicit map or concrete distribution must never be silently changed.
 Under the current default distribution, meshes with at least 3 rows and
-3 columns keep the E/V/C row rotation. An authorized design through skills
-01 and 06 may select another validated placement before compilation.
+3 columns use alternating E/V rows with no C. Skill 01 migrates the selected
+JSON before compilation; C remains only in the existing small adaptations.
 
 Existing files in `programas/<operacion>/` are generated outputs, not inputs
 that prevent compilation. On every invocation, rebuild the IR, graphs, initial
@@ -122,24 +122,23 @@ C = computo    scalar and vector arithmetic (E + V)
 G = generico   memory and scalar compute; vector ISA when configured
 ```
 
-The `distribucion` of `src/cgra.json` (`ciclo_filas`) rotates the compute rows
-escalar, vectorial, computo: row `f` is `E`, `V` or `C` for `f mod 3` = 0, 1, 2:
+The selected large-mesh `distribucion.ciclo_filas` alternates E and V:
 
 ```text
 memory PEs:   PE(f, 0) and PE(f, columnas - 1), for every row f
 compute PEs:  PE(f, c) with 1 <= c <= columnas - 2
 
-f mod 3 = 0:  M E E ... E M
-f mod 3 = 1:  M V V ... V M
-f mod 3 = 2:  M C C ... C M
+f mod 2 = 0:  M E E ... E M
+f mod 2 = 1:  M V V ... V M
 ```
 
-This picture describes the existing border distribution, not the narrow-mesh
-exceptions. A generic PE can fulfill both memory and compute roles locally.
-When the mesh cannot hold E, V and C (fewer than 3 rows or columns), only C is
-used for compute: `"adaptar_mallas_pequenas": true` in `src/cgra.json` makes
-the simulator generate that layout for any size (see
-[Small Meshes](01-receive-inputs.md#small-meshes)).
+For at least 3 rows AND 3 columns, no PE is C, even idle or relaying.
+Skill 01 must migrate the old E/V/C configuration and validate the actual
+printed map before regenerating programs. These instructions do not change
+an existing JSON automatically. C is reserved for the existing small-layout
+convention (fewer than 3 rows OR columns); G serves the singleton 1x1.
+See [Small Meshes](01-receive-inputs.md#small-meshes) and the
+[hardware policy](06-map-to-mesh.md#specialized-first-policy).
 
 ## Instruction Set per PE Type
 

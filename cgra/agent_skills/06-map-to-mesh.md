@@ -60,6 +60,37 @@ Matmul and convolucion may use the local-memory chains instead
 [convolucion](#convolucion-local-memory-chains)), which do give work to
 the PEs farther from the server.
 
+## Specialized-First Policy
+
+This hardware policy takes precedence over inventory preservation, scheduling
+costs and the group/chain templates below when applying the requested standard
+layout. Resolve it once in skill 01 before compiling any operation.
+
+- **Large mesh:** at least 3 rows AND 3 columns. Keep M on both border
+  columns and alternate interior rows E, V (`fila % 2`: 0 = E, 1 = V).
+  No position may be C, even for relays, tails, reductions, route problems,
+  storage limitations or performance. Replace the old E/V/C distribution,
+  rather than merely leaving its C PEs idle. Keep G out of this standard
+  large layout too; it must not serve as a substitute for C.
+- **Small mesh:** fewer than 3 rows OR fewer than 3 columns, using the
+  project's existing small-layout convention. Preserve the M/C adaptations
+  of skill 01 and the singleton G for 1x1. Only these small layouts may use C.
+  A small tile inside a large mesh does not qualify for this exception.
+- Use E for scalar arithmetic and V for vector arithmetic, including tails,
+  accumulation and reductions. Reuse them sequentially and check complete
+  operand/result routes and local storage. If a large layout is infeasible,
+  report the concrete limitation; never add or enable C to make it work.
+- Record `compute_fallbacks` for small-layout C use: PE, physical mesh
+  dimensions, tile/block or phase, work and small-layout reason. On a large
+  mesh the list must be empty and the printed map must contain no C.
+
+The runtime still reads the JSON. Skill 01 must materialize and validate this
+layout before mapping; a documentation change alone does not change the
+simulator map. Explicit user hardware constraints override the default, but
+report any conflict instead of claiming that a map containing C satisfies
+this policy. Once selected, preserve the map and tile ownership across all
+operations. C instruction permissions remain unchanged for small meshes.
+
 ## Standard Border Mesh
 
 ```text
@@ -350,7 +381,8 @@ borrow a PE from another tile. Input/output elements must be covered once.
 
 Build the baseline and feasible alternatives from the IR/DDG, required
 instructions, available PE capabilities, routes and data reuse. For each
-implemented mapping, consider eligible scalar and vector resources together,
+implemented mapping, first apply the Specialized-First Policy; consider only
+policy-compliant scalar and vector resources together,
 including mixed groups or chains when their schedules support them. Do not
 force scalar chains into a vector-only winner merely to increase occupancy.
 Keep accumulator dependencies and scalar remainders explicit.
@@ -365,7 +397,10 @@ the global completion time is the slowest tile plus any remaining combination
 and stores; count these from the final schedule rather than assuming they
 are constant across mappings.
 
-Publish only a fully validated schedule with fewer total cycles than the
+First replace a policy-violating baseline with a fully validated,
+policy-compliant schedule even if it takes more cycles; record this as a
+policy correction, not a speedup. For subsequent performance alternatives,
+publish only a fully validated schedule with fewer total cycles than the
 validated baseline; on a tie retain the baseline. A lower-cost estimate is
 not evidence of a speedup. Record the alternatives actually generated,
 their validation status, executed cycles and the reason for selection.
@@ -553,7 +588,7 @@ column hop into a V:   the V does not add: it receives into rT and, on its own
 ```
 
 This particular scalar-forwarding route ends in E/C and assumes no consecutive
-V rows, as in the standard rotation E,V,C. Arbitrary explicit maps must use
+V rows, as in the standard rotation E,V. Arbitrary explicit maps must use
 the gathering route of skill 07 (scalar, or vector when no PE has `ADD`),
 including consecutive V nodes, rather than applying this specialization
 without checking capabilities.
@@ -831,6 +866,7 @@ memory list per memory PE       (LD/ST it performs for its compute PE)
 reduction route                 (border route or gathering route per tile, roots, combination, output PE)
 esquema                         (grupos or cadenas; with cadenas: the option, T and the units of every chain)
 candidate_comparison            (baseline and generated alternatives: assignment estimate, actual cycles, validation, selection)
+compute_fallbacks               (small-layout C only: PE, physical dimensions, tile/block/phase, work and adaptation reason; empty on large meshes)
 ```
 
 ## Notes

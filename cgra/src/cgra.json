@@ -1,7 +1,7 @@
 {
-  "descripcion": "Formato de la CGRA: tamaño de la malla, memoria, ancho de los vectores y tipos de PE. Las columnas de los bordes (oeste y este) son solo de memoria (M); en el resto las filas rotan escalar (E), vectorial (V) y cómputo (C), que es escalar y vectorial a la vez (fila 0 E, fila 1 V, fila 2 C, fila 3 E...). Si la malla no alcanza para E, V y C (menos de 3 filas o columnas), con 'adaptar_mallas_pequenas' el cómputo es solo C (1x1: G; Nx1: M arriba y C debajo; Nx2: M C; 1 o 2 filas: M C ... C M) sin cambiar este archivo; desde 3x3 se usa la rotación. Una 'malla' explícita manda sobre ambas. Lo leen el simulador en C (c/src/configuracion.c) y los skills (agent_skills/01-receive-inputs.md). Cada PE tiene 16 registros escalares (r0..r15; rA, rB, rC, rT y acc son r0..r4) y, con 'palabras_locales', una memoria local propia (LDL/STL/VLDL/VSTL con local[i]); solo los M acceden a la memoria de datos (memoria.bin).",
-  "filas": 4,
-  "columnas": 4,
+  "descripcion": "Formato de la CGRA: tamaño de la malla, memoria, ancho de los vectores y tipos de PE. Las columnas de los bordes (oeste y este) son solo de memoria (M); en el resto las filas alternan escalar (E) y vectorial (V), sin PEs C (fila 0 E, fila 1 V, fila 2 E, fila 3 V...). Para las mallas pequeñas (menos de 3 filas o columnas), con 'adaptar_mallas_pequenas' el cómputo es solo C (1x1: G; Nx1: M arriba y C debajo; Nx2: M C; 1 o 2 filas: M C ... C M) sin cambiar este archivo; desde 3x3 se usa la alternancia E/V. Una 'malla' explícita manda sobre ambas. Lo leen el simulador en C (c/src/configuracion.c) y los skills (agent_skills/01-receive-inputs.md). Cada PE tiene 16 registros escalares (r0..r15; rA, rB, rC, rT y acc son r0..r4) y, con 'palabras_locales', una memoria local propia (LDL/STL/VLDL/VSTL con local[i]); solo los M acceden a la memoria de datos (memoria.bin).",
+  "filas": 32,
+  "columnas": 32,
   "palabras_memoria": 16384,
   "ancho_vector": 4,
   "palabras_locales": 512,
@@ -44,11 +44,6 @@
         "oeste": "M",
         "este": "M",
         "resto": "V"
-      },
-      {
-        "oeste": "M",
-        "este": "M",
-        "resto": "C"
       }
     ]
   }

@@ -73,9 +73,26 @@ program is still validated by loading it in the simulator, as below.
     validated baseline on copies of the same initial image and configuration.
     Require identical coverage and numerical results, preserved block
     ownership/order and same-cycle transfer pairs.
-    Publish only if the complete executed cycle count decreases. Record a
+    For a policy-compliant baseline, publish a performance alternative only
+    if the complete executed cycle count decreases. A policy correction may
+    replace a baseline that uses C unnecessarily even when cycles increase;
+    report the increase explicitly and do not claim a speedup. Record a
     rejected candidate's reason without replacing the baseline. Rebuild the
     selected manifest, validation and reports from actual PE streams.
+20. Enforce the [Specialized-First Policy](06-map-to-mesh.md#specialized-first-policy)
+    against the actual PE streams, including initialization, tails, local
+    reductions and the combination between tiles. Every scalar/vector
+    arithmetic instruction, VREDSUM and VBCAST on a type C PE must correspond
+    to work justified in `compute_fallbacks` on a small physical mesh only.
+    For at least 3 rows and 3 columns, reject any C in the actual printed map
+    or PE headers, even idle or relay-only C; require M border columns and
+    E/V interior rows alternating by `fila % 2`. Require an empty
+    `compute_fallbacks`. A small tile is not a small physical mesh exception.
+    For small layouts check the dimensions and documented adaptation; generic
+    G is the singleton exception. Simulator
+    acceptance checks permissions, not this preference; perform this policy
+    review separately and do not claim the loader enforces it.
+
 Checks 2-6 and 11-13 are what the simulator enforces when it loads the
 program, together with the instruction permissions of check 12 and the missing
 PE files of check 1; run them with the simulator instead of re-implementing
