@@ -8,7 +8,8 @@ set -euo pipefail
 muestras=${1:-120}
 c=$(cd "$(dirname "$0")/.." && pwd)    # cgra/c
 salida=$c/perfilado
-export CC=$HOME/micromamba/envs/cuda/bin/x86_64-conda-linux-gnu-gcc
+# Solo para entorno.txt: el binario es el build/cgra de perfilar_cpu.sh.
+export CC=${CC:-gcc}
 export OPT=-O2
 
 for destino in "$c"/perfilado/entradas/*x*; do

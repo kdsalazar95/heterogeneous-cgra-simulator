@@ -3,17 +3,35 @@
 # y guarda el desglose de E4 de cada muestra en <programa>_<malla>_GPU_desglose.csv.
 #
 #   perfilar_gpu.sh [muestras=120] [variante=GPU]
+#
+# Compila con compilar_gpu.sh, que toma CC, CXX, NVCC, ARCH y CUDA_LIB del
+# entorno (por defecto, la Jetson Nano).
 set -euo pipefail
 
 muestras=${1:-120}
 variante=${2:-GPU}
 c=$(cd "$(dirname "$0")/.." && pwd)    # cgra/c
 salida=$c/perfilado
-export CC=$HOME/micromamba/envs/cuda/bin/nvcc
-export OPT="-O2 --fmad=false -arch=sm_89"
+mkdir -p "$salida"
 
+# Antes de cambiar CC: compilar_gpu.sh lo usa para los .c.
 "$c/scripts/compilar_gpu.sh" > /dev/null
-nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv >> "$salida/entorno.txt"
+
+# Para entorno.txt (perfilar.sh registra CC y OPT).
+export CC=${NVCC:-/usr/local/cuda/bin/nvcc}
+export OPT="-O2 --fmad=false -arch=${ARCH:-sm_53}"
+
+# La GPU: nvidia-smi en una PC; en una Jetson no existe y se lee el modelo y L4T.
+{
+    echo "=== GPU ($variante): $(date -Iseconds)"
+    if command -v nvidia-smi > /dev/null; then
+        nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
+    else
+        tr -d '\0' < /proc/device-tree/model 2>/dev/null && echo
+        head -1 /etc/nv_tegra_release 2>/dev/null || echo "L4T: no disponible"
+    fi
+    "$CC" --version | tail -1
+} >> "$salida/entorno.txt"
 
 for destino in "$c"/perfilado/entradas/*x*; do
     malla=$(basename "$destino")
