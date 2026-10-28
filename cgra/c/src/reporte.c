@@ -19,6 +19,7 @@
 
 #include "error.h"
 #include "formato_numero.h"
+#include "perfil.h"
 #include "salida.h"
 
 #define ANCHO_REPORTE 80
@@ -521,6 +522,13 @@ static void seccion_ciclos(Reporte *r) {
     if (!envios) {
         agregar_linea(r->lineas, "  (este programa no manda datos entre PEs)");
     }
+#ifdef CGRA_GPU
+    int seccion_ciclos_gpu(Lineas *lineas, const Programas *p, const FormatoCGRA *f);
+    if (!r->traza) {
+        r->error |= seccion_ciclos_gpu(r->lineas, p, f) != 0;
+        return;
+    }
+#endif
 
     for (uint32_t ciclo = 0; ciclo < p->ciclos && !r->error && !r->lineas->error; ++ciclo) {
         agregar_linea(r->lineas, "%s", "");
@@ -612,11 +620,27 @@ static void seccion_memoria_final(Reporte *r) {
     }
 }
 
+// Desglose de E5 para el perfilado: solo si existe CGRA_DESGLOSE_E5.
+static void anotar_desglose_e5(const uint64_t *t) {
+    const char *ruta = getenv("CGRA_DESGLOSE_E5");
+    FILE *archivo = ruta ? fopen(ruta, "a") : NULL;
+    if (!archivo) {
+        return;
+    }
+    for (int i = 1; i < 7; ++i) {
+        fprintf(archivo, i == 1 ? "%llu" : ",%llu", (unsigned long long)(t[i] - t[i - 1]));
+    }
+    fputc('\n', archivo);
+    fclose(archivo);
+}
+
 // ------------------------------------------------------------------- público
 
 int armar_reporte(Lineas *lineas, const Programas *programas, const FormatoCGRA *formato,
                   const Memoria *memoria, const char *carpeta, const Traza *traza) {
     Reporte r = {lineas, programas, formato, memoria, traza, NULL, {0}, 0};
+    uint64_t t[7];
+    t[0] = ahora_ns();
     r.conteos = calloc((size_t)programas->pes * NUM_OPCODES, sizeof *r.conteos);
     if (!r.conteos || crear_escrituras(&r.escrituras, memoria) != 0) {
         r.error = 1;
@@ -630,6 +654,7 @@ int armar_reporte(Lineas *lineas, const Programas *programas, const FormatoCGRA 
             }
         }
     }
+    t[1] = ahora_ns();
 
     if (!r.error) {
         // Path(carpeta).name en mayúsculas.
@@ -645,14 +670,20 @@ int armar_reporte(Lineas *lineas, const Programas *programas, const FormatoCGRA 
         seccion_configuracion(&r, carpeta);
         seccion_resultado(&r);
         seccion_resumen(&r);
+        t[2] = ahora_ns();
         seccion_distribucion(&r);
+        t[3] = ahora_ns();
         seccion_actividad(&r);
+        t[4] = ahora_ns();
         seccion_ciclos(&r);
+        t[5] = ahora_ns();
         seccion_memoria_final(&r);
         agregar_linea(lineas, "%s", "");
         linea_doble(&r);
         agregar_linea(lineas, "FIN DEL REPORTE");
         linea_doble(&r);
+        t[6] = ahora_ns();
+        anotar_desglose_e5(t);
     }
 
     liberar_escrituras(&r.escrituras, memoria);
