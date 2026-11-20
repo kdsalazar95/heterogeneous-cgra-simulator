@@ -8,6 +8,7 @@
 #define TEXTO_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "error.h"
@@ -15,6 +16,18 @@
 // El archivo entero, terminado en '\0'. NULL si no se pudo leer (errno
 // dice por qué); no anota ningún error.
 char *leer_archivo(const char *ruta, size_t *largo);
+
+// Los dígitos ASCII desde c (que empieza con uno), como strtoull(c, NULL,
+// 10) pero sin pasar por la biblioteca: UINT64_MAX si no cabe, igual que
+// strtoull con ERANGE.
+static inline uint64_t leer_natural(const char *c) {
+    uint64_t n = 0;
+    for (; *c >= '0' && *c <= '9'; ++c) {
+        unsigned d = (unsigned)(*c - '0');
+        n = n > (UINT64_MAX - d) / 10 ? UINT64_MAX : n * 10 + d;
+    }
+    return n;
+}
 
 // Un texto que crece. Si una asignación falla, error queda en 1 y las
 // siguientes llamadas no hacen nada: basta revisarlo al final.

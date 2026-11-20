@@ -1,5 +1,6 @@
 /*
- * Mensaje del último error, en un búfer fijo.
+ * Mensaje del último error, en un búfer fijo por hilo: los hilos de
+ * leer_programas() (OpenMP) anotan sus errores sin pisarse.
  */
 
 #include "error.h"
@@ -10,7 +11,7 @@
 
 #define LARGO_MENSAJE 16384
 
-static char mensaje[LARGO_MENSAJE];
+static _Thread_local char mensaje[LARGO_MENSAJE];
 
 void anotar_error(const char *formato, ...) {
     va_list argumentos;

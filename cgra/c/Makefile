@@ -2,6 +2,8 @@ CC       ?= gcc
 OPT      ?= -O2
 CFLAGS   ?= -std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L
 BUILD    ?= build
+# E2 lee los PE*.txt en paralelo. OPENMP= compila la versión secuencial.
+OPENMP   ?= -fopenmp
 
 # cgra/, para encontrar src/cgra.json, programas/ y operaciones/ desde
 # cualquier directorio. Si se mueve el repositorio hay que recompilar.
@@ -15,10 +17,10 @@ OBJETOS  := $(MODULOS:%=$(BUILD)/%.o)
 # Sin -ffp-contract el compilador puede fusionar a * b + c en una sola
 # instrucción (FMA) y el resultado ya no coincide con el de Python.
 $(BUILD)/cgra: $(OBJETOS)
-	$(CC) $(CFLAGS) $(OPT) $(LDFLAGS) $^ -o $@ -lm
+	$(CC) $(CFLAGS) $(OPT) $(OPENMP) $(LDFLAGS) $^ -o $@ -lm
 
 $(BUILD)/%.o: src/%.c $(wildcard include/*.h) | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OPT) -ffp-contract=off -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OPT) $(OPENMP) -ffp-contract=off -c $< -o $@
 
 $(BUILD):
 	mkdir -p $@

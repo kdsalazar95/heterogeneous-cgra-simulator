@@ -16,12 +16,12 @@
 
 #define LARGO_PE_ID 32
 
-// Las instrucciones tal como se leyeron, en el orden de cada archivo.
+// Las instrucciones de un PE tal como se leyeron, en el orden del archivo.
+// Cada PE tiene las suyas, para leer los archivos en paralelo.
 typedef struct {
     Instruccion *instrucciones;
     uint64_t *ciclos;
     size_t cantidad, capacidad;
-    size_t *inicio;              // [pe]: primera instrucción de ese PE; [pes]: total
 } Leidas;
 
 typedef struct {
@@ -31,14 +31,15 @@ typedef struct {
     // [pe * ciclos + k]: el ciclo de la k-ésima línea del archivo del PE.
     // El reporte recorre las instrucciones en ese orden, como Python.
     uint32_t *orden_archivo;
-    Leidas leidas;               // solo entre leer_programas() y validar_programas()
+    Leidas *leidas;              // [pe], solo entre leer_programas() y validar_programas()
 } Programas;
 
 static inline const Instruccion *instruccion(const Programas *programas, uint32_t pe, uint32_t ciclo) {
     return &programas->por_pe[(size_t)pe * programas->ciclos + ciclo];
 }
 
-// E2: lee los PE*.txt de la malla, fila por fila. 0 ok, -1 error.
+// E2: lee los PE*.txt de la malla (en paralelo si se compila con
+// -fopenmp), cada PE en su entrada de leidas. 0 ok, -1 error.
 int  leer_programas(const char *directorio, const FormatoCGRA *formato, Programas *programas);
 // E3: ciclos, comunicaciones, tipos de PE, enlace con la memoria y
 // registros. 0 ok, -1 error de carga, ERROR_EJECUCION si el error es uno

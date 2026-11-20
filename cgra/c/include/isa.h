@@ -96,9 +96,9 @@ typedef struct {
     char *registro_invalido;    // "Registro desconocido: rX", el primero que fallaría
 } Instruccion;
 
-// "ADD rC, rA, rB" -> Instruccion. origen ("PE00.txt, ciclo 5") va en los
-// mensajes de error. 0 ok, -1 error.
-int  parsear_instruccion(const char *texto, const char *origen, Instruccion *inst);
+// "ADD rC, rA, rB" -> Instruccion. Los mensajes de error empiezan con
+// "<ruta>, ciclo <ciclo>: " ("PE00.txt, ciclo 5: ..."). 0 ok, -1 error.
+int  parsear_instruccion(const char *texto, const char *ruta, uint64_t ciclo, Instruccion *inst);
 void liberar_instruccion(Instruccion *inst);
 
 // Índice de un nombre en mayúsculas ("VADD"), o -1.

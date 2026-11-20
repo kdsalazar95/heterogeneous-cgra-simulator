@@ -6,7 +6,6 @@
 #include "isa.h"
 
 #include <ctype.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,11 +26,21 @@ const char *const DIRECCION_EN_ESPANOL[4] = {"norte", "sur", "este", "oeste"};
 const char *const NOMBRES_REGISTROS[] = {"rA", "rB", "rC", "rT", "acc"};
 
 #define CANTIDAD_NOMBRES (sizeof NOMBRES_REGISTROS / sizeof *NOMBRES_REGISTROS)
+
+// El "<ruta>, ciclo <ciclo>" de los mensajes de error. Solo se arma si hay
+// un error, no por cada línea.
+#define ORIGEN "%s, ciclo %llu"
+#define ARGS_ORIGEN(o) (o)->ruta, (unsigned long long)(o)->ciclo
+typedef struct {
+    const char *ruta;
+    uint64_t ciclo;
+} Origen;
 #define MAX_PARTES 5   // la instrucción y hasta 3 operandos; una más ya es un error
 
 int buscar_opcode(const char *nombre) {
     for (int op = 0; op < NUM_OPCODES; ++op) {
-        if (strcmp(nombre, NOMBRES_OPCODES[op]) == 0) {
+        // La primera letra descarta casi todos sin llamar a strcmp().
+        if (nombre[0] == NOMBRES_OPCODES[op][0] && strcmp(nombre, NOMBRES_OPCODES[op]) == 0) {
             return op;
         }
     }
@@ -100,24 +109,22 @@ static int convertir_a_float(const char *texto, double *valor) {
 }
 
 // local[indice], con el patrón ^local\[(\d+)\]$ de isa.py.
-static int operando_local(const char *texto, const char *origen, Instruccion *inst) {
+static int operando_local(const char *texto, const Origen *origen, Instruccion *inst) {
     const char *c = texto + strlen("local[");
     int valido = strncmp(texto, "local[", strlen("local[")) == 0 && isdigit((unsigned char)*c);
     while (valido && isdigit((unsigned char)*c)) {
         ++c;
     }
     if (!valido || c[0] != ']' || c[1] != '\0') {
-        anotar_error("%s: memoria local inválida '%s'", origen, texto);
+        anotar_error(ORIGEN ": memoria local inválida '%s'", ARGS_ORIGEN(origen), texto);
         return -1;
     }
-    errno = 0;
-    unsigned long long indice = strtoull(texto + strlen("local["), NULL, 10);
-    inst->indice = errno == ERANGE ? UINT64_MAX : indice;
+    inst->indice = leer_natural(texto + strlen("local["));
     return 0;
 }
 
 // banco[indice], con el patrón ^([A-Za-z_]\w*)\[(\d+)\]$ de isa.py.
-static int operando_memoria(char *texto, const char *origen, Instruccion *inst) {
+static int operando_memoria(char *texto, const Origen *origen, Instruccion *inst) {
     char *corchete = strchr(texto, '[');
     int valido = corchete && corchete != texto && (isalpha((unsigned char)texto[0]) || texto[0] == '_');
     for (char *c = texto; valido && c < corchete; ++c) {
@@ -130,13 +137,11 @@ static int operando_memoria(char *texto, const char *origen, Instruccion *inst) 
     }
     valido = valido && digito[0] == ']' && digito[1] == '\0';
     if (!valido) {
-        anotar_error("%s: memoria inválida '%s'", origen, texto);
+        anotar_error(ORIGEN ": memoria inválida '%s'", ARGS_ORIGEN(origen), texto);
         return -1;
     }
     *corchete = '\0';
-    errno = 0;
-    unsigned long long indice = strtoull(corchete + 1, NULL, 10);
-    inst->indice = errno == ERANGE ? UINT64_MAX : indice;
+    inst->indice = leer_natural(corchete + 1);
     inst->banco = copiar(texto);
     return inst->banco ? 0 : -1;
 }
@@ -151,21 +156,29 @@ static int registro(Instruccion *inst, int8_t *campo, const char *nombre, int ve
         }
     } else {
         for (size_t r = 0; r < CANTIDAD_NOMBRES; ++r) {
-            if (strcmp(nombre, NOMBRES_REGISTROS[r]) == 0) {
+            if (nombre[0] == NOMBRES_REGISTROS[r][0] && strcmp(nombre, NOMBRES_REGISTROS[r]) == 0) {
                 *campo = (int8_t)r;
             }
         }
         // r0..r15, sin ceros a la izquierda (r05 no existe en isa.py).
         if (nombre[0] == 'r' && isdigit((unsigned char)nombre[1]) && (nombre[1] != '0' || !nombre[2])) {
-            char *fin;
-            long numero = strtol(nombre + 1, &fin, 10);
-            if (!*fin && numero < NUM_REGISTROS) {
+            const char *c = nombre + 1;
+            unsigned numero = 0;
+            while (isdigit((unsigned char)*c) && numero < NUM_REGISTROS) {
+                numero = numero * 10 + (unsigned)(*c++ - '0');
+            }
+            if (!*c && numero < NUM_REGISTROS) {
                 *campo = (int8_t)numero;
             }
         }
     }
     if (campo == &inst->dst && !vectorial) {
-        snprintf(inst->nombre_dst, sizeof inst->nombre_dst, "%s", nombre);
+        // Los primeros caracteres que caben, como snprintf("%s").
+        size_t k = 0;
+        for (; k + 1 < sizeof inst->nombre_dst && nombre[k]; ++k) {
+            inst->nombre_dst[k] = nombre[k];
+        }
+        inst->nombre_dst[k] = '\0';
     }
     if (*campo != REGISTRO_INVALIDO || inst->registro_invalido) {
         return 0;
@@ -183,7 +196,7 @@ static int direccion(Instruccion *inst, char *texto) {
     }
     inst->dir = DIRECCION_INVALIDA;
     for (int d = 0; d < 4; ++d) {
-        if (strcmp(texto, DIRECCION_EN_INGLES[d]) == 0) {
+        if (texto[0] == DIRECCION_EN_INGLES[d][0] && strcmp(texto, DIRECCION_EN_INGLES[d]) == 0) {
             inst->dir = (int8_t)d;
         }
     }
@@ -196,19 +209,42 @@ static int direccion(Instruccion *inst, char *texto) {
 
 // ------------------------------------------------------------------- parseo
 
+// La instrucción reescrita (ISA.texto()) se arma a mano en un búfer: con
+// agregar_texto() eran dos vsnprintf() y un malloc() por instrucción.
+static char *poner(char *p, const char *texto) {
+    size_t largo = strlen(texto);
+    memcpy(p, texto, largo);
+    return p + largo;
+}
+
+static char *poner_natural(char *p, uint64_t n) {
+    char digitos[20];
+    int k = 0;
+    do {
+        digitos[k++] = (char)('0' + n % 10);
+        n /= 10;
+    } while (n);
+    while (k) {
+        *p++ = digitos[--k];
+    }
+    return p;
+}
+
 // Resuelve los operandos de una instrucción con el número correcto de
 // ellos. Los registros se resuelven en el orden en que PE.ejecutar() los
-// lee y escribe, para que el error sea el mismo que en Python.
-static int resolver(Instruccion *inst, char **a, const char *origen) {
+// lee y escribe, para que el error sea el mismo que en Python. largo es el
+// de la línea original: el texto reescrito nunca la supera en más que un
+// número de MOV y unos separadores.
+static int resolver(Instruccion *inst, char **a, const Origen *origen, size_t largo) {
     Opcode op = inst->op;
     int v = es_vectorial(op);
     int resultado = 0;
-    Texto texto = {0};
+    char texto[largo + LARGO_NUMERO + 32], *p = texto;
     char numero[LARGO_NUMERO];
 
     switch (op) {
     case OP_NOP:
-        agregar_texto(&texto, "NOP");
+        p = poner(p, "NOP");
         break;
     case OP_MOV:
         if (convertir_a_float(a[1], &inst->imm) != 0) {
@@ -217,7 +253,7 @@ static int resolver(Instruccion *inst, char **a, const char *origen) {
         }
         resultado = registro(inst, &inst->dst, a[0], 0);
         formatear_numero(numero, inst->imm);
-        agregar_texto(&texto, "MOV %s, %s", a[0], numero);
+        p = poner(poner(poner(poner(p, "MOV "), a[0]), ", "), numero);
         break;
     case OP_LD:
     case OP_VLD:
@@ -225,8 +261,8 @@ static int resolver(Instruccion *inst, char **a, const char *origen) {
             return -1;
         }
         resultado = registro(inst, &inst->dst, a[0], v);
-        agregar_texto(&texto, "%s %s, %s[%llu]", NOMBRES_OPCODES[op], a[0], inst->banco,
-                      (unsigned long long)inst->indice);
+        p = poner(poner(poner(poner(poner(p, NOMBRES_OPCODES[op]), " "), a[0]), ", "), inst->banco);
+        p = poner(poner_natural(poner(p, "["), inst->indice), "]");
         break;
     case OP_ST:
     case OP_VST:
@@ -234,15 +270,17 @@ static int resolver(Instruccion *inst, char **a, const char *origen) {
             return -1;
         }
         resultado = registro(inst, &inst->src1, a[1], v);
-        agregar_texto(&texto, "%s %s[%llu], %s", NOMBRES_OPCODES[op], inst->banco,
-                      (unsigned long long)inst->indice, a[1]);
+        p = poner(poner(poner(p, NOMBRES_OPCODES[op]), " "), inst->banco);
+        p = poner(poner_natural(poner(p, "["), inst->indice), "], ");
+        p = poner(p, a[1]);
         break;
     case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV:
     case OP_VADD: case OP_VSUB: case OP_VMUL: case OP_VDIV:
         resultado = registro(inst, &inst->src1, a[1], v);
         resultado |= registro(inst, &inst->src2, a[2], v);
         resultado |= registro(inst, &inst->dst, a[0], v);
-        agregar_texto(&texto, "%s %s, %s, %s", NOMBRES_OPCODES[op], a[0], a[1], a[2]);
+        p = poner(poner(poner(poner(p, NOMBRES_OPCODES[op]), " "), a[0]), ", ");
+        p = poner(poner(poner(p, a[1]), ", "), a[2]);
         break;
     case OP_LDL:
     case OP_VLDL:
@@ -250,7 +288,8 @@ static int resolver(Instruccion *inst, char **a, const char *origen) {
             return -1;
         }
         resultado = registro(inst, &inst->dst, a[0], v);
-        agregar_texto(&texto, "%s %s, local[%llu]", NOMBRES_OPCODES[op], a[0], (unsigned long long)inst->indice);
+        p = poner(poner(poner(poner(p, NOMBRES_OPCODES[op]), " "), a[0]), ", local[");
+        p = poner(poner_natural(p, inst->indice), "]");
         break;
     case OP_STL:
     case OP_VSTL:
@@ -258,54 +297,58 @@ static int resolver(Instruccion *inst, char **a, const char *origen) {
             return -1;
         }
         resultado = registro(inst, &inst->src1, a[1], v);
-        agregar_texto(&texto, "%s local[%llu], %s", NOMBRES_OPCODES[op], (unsigned long long)inst->indice, a[1]);
+        p = poner(poner(p, NOMBRES_OPCODES[op]), " local[");
+        p = poner(poner(poner_natural(p, inst->indice), "], "), a[1]);
         break;
     case OP_VREDSUM:   // escalar <- suma de un vector
     case OP_VBCAST:    // vector <- un escalar en todos los carriles
         resultado = registro(inst, &inst->src1, a[1], op == OP_VREDSUM);
         resultado |= registro(inst, &inst->dst, a[0], op == OP_VBCAST);
-        agregar_texto(&texto, "%s %s, %s", NOMBRES_OPCODES[op], a[0], a[1]);
+        p = poner(poner(poner(poner(poner(p, NOMBRES_OPCODES[op]), " "), a[0]), ", "), a[1]);
         break;
     case OP_SEND:
     case OP_VSEND:
         resultado = direccion(inst, a[0]);
         resultado |= registro(inst, &inst->src1, a[1], v);
-        agregar_texto(&texto, "%s %s, %s", NOMBRES_OPCODES[op], a[0], a[1]);
+        p = poner(poner(poner(poner(poner(p, NOMBRES_OPCODES[op]), " "), a[0]), ", "), a[1]);
         break;
     case OP_RECV:
     case OP_VRECV:
         resultado = direccion(inst, a[0]);
         resultado |= registro(inst, &inst->dst, a[1], v);
-        agregar_texto(&texto, "%s %s, %s", NOMBRES_OPCODES[op], a[0], a[1]);
+        p = poner(poner(poner(poner(poner(p, NOMBRES_OPCODES[op]), " "), a[0]), ", "), a[1]);
         break;
     case NUM_OPCODES:
         break;
     }
-    if (texto.error) {
+    size_t usado = (size_t)(p - texto);
+    inst->texto = malloc(usado + 1);
+    if (!inst->texto) {
         anotar_error("Sin memoria para leer los programas");
-        liberar_texto(&texto);
         return -1;
     }
-    inst->texto = texto.datos;
+    memcpy(inst->texto, texto, usado);
+    inst->texto[usado] = '\0';
     return resultado;
 }
 
-int parsear_instruccion(const char *texto, const char *origen, Instruccion *inst) {
+// Las comas separan igual que los espacios.
+static int es_separador(unsigned char c) {
+    return c == ',' || es_espacio(c);
+}
+
+int parsear_instruccion(const char *texto, const char *ruta, uint64_t ciclo, Instruccion *inst) {
     memset(inst, 0, sizeof *inst);
     inst->region = -1;
     inst->dir = DIRECCION_INVALIDA;
+    const Origen origen = {ruta, ciclo};
 
-    // Las comas separan igual que los espacios.
-    char copia[strlen(texto) + 1], *partes[MAX_PARTES];
+    size_t largo = strlen(texto);
+    char copia[largo + 1], *partes[MAX_PARTES];
     int cantidad = 0;
-    strcpy(copia, texto);
-    for (char *c = copia; *c; ++c) {
-        if (*c == ',') {
-            *c = ' ';
-        }
-    }
+    memcpy(copia, texto, largo + 1);
     for (char *c = copia; *c && cantidad <= MAX_PARTES;) {
-        while (*c && es_espacio((unsigned char)*c)) {
+        while (*c && es_separador((unsigned char)*c)) {
             *c++ = '\0';
         }
         if (!*c) {
@@ -316,12 +359,12 @@ int parsear_instruccion(const char *texto, const char *origen, Instruccion *inst
             break;
         }
         partes[cantidad++] = c;
-        while (*c && !es_espacio((unsigned char)*c)) {
+        while (*c && !es_separador((unsigned char)*c)) {
             ++c;
         }
     }
     if (cantidad == 0) {
-        anotar_error("%s: instrucción vacía", origen);
+        anotar_error(ORIGEN ": instrucción vacía", ARGS_ORIGEN(&origen));
         return -1;
     }
 
@@ -330,11 +373,11 @@ int parsear_instruccion(const char *texto, const char *origen, Instruccion *inst
     }
     int op = buscar_opcode(partes[0]);
     if (op < 0 || cantidad - 1 != operandos((Opcode)op)) {
-        anotar_error("%s: sintaxis no válida: '%s'", origen, texto);
+        anotar_error(ORIGEN ": sintaxis no válida: '%s'", ARGS_ORIGEN(&origen), texto);
         return -1;
     }
     inst->op = (Opcode)op;
-    if (resolver(inst, partes + 1, origen) != 0) {
+    if (resolver(inst, partes + 1, &origen, largo) != 0) {
         liberar_instruccion(inst);
         return -1;
     }

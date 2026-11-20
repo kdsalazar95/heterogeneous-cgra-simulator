@@ -61,21 +61,25 @@ static int es_espacio(unsigned char c) {
 
 // Bytes del fin de línea que empieza en p, como str.splitlines(): \n, \r,
 // \r\n, \v, \f, \x1c-\x1e y, en UTF-8, U+0085, U+2028 y U+2029. 0 si no hay.
-static size_t fin_de_linea(const char *p) {
+// Se llama por cada carácter, así que los comunes salen en la primera
+// comparación.
+static inline size_t fin_de_linea(const char *p) {
     const unsigned char *c = (const unsigned char *)p;
-    if (c[0] == '\r' && c[1] == '\n') {
-        return 2;
+    if (c[0] > 0x1e && c[0] != 0xC2 && c[0] != 0xE2) {
+        return 0;
     }
-    if (strchr("\n\r\v\f\x1c\x1d\x1e", c[0]) && c[0]) {
+    switch (c[0]) {
+    case '\r':
+        return c[1] == '\n' ? 2 : 1;
+    case '\n': case '\v': case '\f': case 0x1c: case 0x1d: case 0x1e:
         return 1;
+    case 0xC2:
+        return c[1] == 0x85 ? 2 : 0;
+    case 0xE2:
+        return c[1] == 0x80 && (c[2] == 0xA8 || c[2] == 0xA9) ? 3 : 0;
+    default:
+        return 0;
     }
-    if (c[0] == 0xC2 && c[1] == 0x85) {
-        return 2;
-    }
-    if (c[0] == 0xE2 && c[1] == 0x80 && (c[2] == 0xA8 || c[2] == 0xA9)) {
-        return 3;
-    }
-    return 0;
 }
 
 // Ruta de un archivo dentro de un directorio, como el operador / de Path.
@@ -95,22 +99,31 @@ static char *unir_ruta(const char *directorio, const char *archivo) {
     return ruta;
 }
 
+// Lugar para al menos 'capacidad' instrucciones. 0 ok, -1 sin memoria.
+static int reservar(Leidas *leidas, size_t capacidad) {
+    if (capacidad <= leidas->capacidad) {
+        return 0;
+    }
+    Instruccion *instrucciones = realloc(leidas->instrucciones, capacidad * sizeof *instrucciones);
+    if (instrucciones) {
+        leidas->instrucciones = instrucciones;
+    }
+    uint64_t *ciclos = realloc(leidas->ciclos, capacidad * sizeof *ciclos);
+    if (ciclos) {
+        leidas->ciclos = ciclos;
+    }
+    if (!instrucciones || !ciclos) {
+        return -1;
+    }
+    leidas->capacidad = capacidad;
+    return 0;
+}
+
 static int agregar(Leidas *leidas, const Instruccion *inst, uint64_t ciclo) {
-    if (leidas->cantidad == leidas->capacidad) {
-        size_t capacidad = leidas->capacidad ? 2 * leidas->capacidad : 1024;
-        Instruccion *instrucciones = realloc(leidas->instrucciones, capacidad * sizeof *instrucciones);
-        if (instrucciones) {
-            leidas->instrucciones = instrucciones;
-        }
-        uint64_t *ciclos = realloc(leidas->ciclos, capacidad * sizeof *ciclos);
-        if (ciclos) {
-            leidas->ciclos = ciclos;
-        }
-        if (!instrucciones || !ciclos) {
-            anotar_error("Sin memoria para cargar los programas");
-            return -1;
-        }
-        leidas->capacidad = capacidad;
+    if (leidas->cantidad == leidas->capacidad
+        && reservar(leidas, leidas->capacidad ? 2 * leidas->capacidad : 1024) != 0) {
+        anotar_error("Sin memoria para cargar los programas");
+        return -1;
     }
     leidas->instrucciones[leidas->cantidad] = *inst;
     leidas->ciclos[leidas->cantidad++] = ciclo;
@@ -148,19 +161,13 @@ static int leer_linea(Leidas *leidas, const char *ruta, size_t numero_linea, cha
     while (es_espacio((unsigned char)*c)) {
         ++c;
     }
-    errno = 0;
-    uint64_t ciclo = strtoull(linea, NULL, 10);
-    if (errno == ERANGE) {
-        ciclo = UINT64_MAX;
-    }
+    uint64_t ciclo = leer_natural(linea);
     if (ciclo_repetido(leidas, vistos, lineas, inicio, ciclo)) {
         anotar_error("%s, ciclo %llu: ciclo duplicado", ruta, (unsigned long long)ciclo);
         return -1;
     }
-    char origen[strlen(ruta) + 32];
-    snprintf(origen, sizeof origen, "%s, ciclo %llu", ruta, (unsigned long long)ciclo);
     Instruccion inst;
-    if (parsear_instruccion(c, origen, &inst) != 0) {
+    if (parsear_instruccion(c, ruta, ciclo, &inst) != 0) {
         return -1;
     }
     if (agregar(leidas, &inst, ciclo) != 0) {
@@ -184,31 +191,30 @@ static int leer_programa_pe(Leidas *leidas, const char *ruta) {
     }
     uint8_t *vistos = calloc(lineas / 8 + 1, 1);
     size_t inicio = leidas->cantidad;
-    int resultado = vistos ? 0 : -1;
-    if (!vistos) {
+    int resultado = vistos && reservar(leidas, inicio + lineas) == 0 ? 0 : -1;
+    if (resultado != 0) {
         anotar_error("Sin memoria para cargar los programas");
     }
 
     char *linea = texto;
     for (size_t numero_linea = 1; resultado == 0 && *linea; ++numero_linea) {
-        char *fin = linea;
+        // El fin de la línea y el primer // (el comentario), en una pasada.
+        char *fin = linea, *comentario = NULL;
         while (*fin && !fin_de_linea(fin)) {
+            if (!comentario && fin[0] == '/' && fin[1] == '/') {
+                comentario = fin;
+            }
             ++fin;
         }
         char *siguiente = fin + fin_de_linea(fin);
-        *fin = '\0';
-
-        char *comentario = strstr(linea, "//");
-        if (comentario) {
-            *comentario = '\0';
-        }
-        while (es_espacio((unsigned char)*linea)) {
+        char *ultimo = comentario ? comentario : fin;
+        while (linea < ultimo && es_espacio((unsigned char)*linea)) {
             ++linea;
         }
-        char *ultimo = linea + strlen(linea);
         while (ultimo > linea && es_espacio((unsigned char)ultimo[-1])) {
-            *--ultimo = '\0';
+            --ultimo;
         }
+        *ultimo = '\0';
         if (*linea) {
             resultado = leer_linea(leidas, ruta, numero_linea, linea, vistos, lineas, inicio);
         }
@@ -223,40 +229,64 @@ static int leer_programa_pe(Leidas *leidas, const char *ruta) {
     return resultado;
 }
 
-int leer_programas(const char *directorio, const FormatoCGRA *formato, Programas *programas) {
-    memset(programas, 0, sizeof *programas);
-    Leidas *leidas = &programas->leidas;
-    programas->pes = cantidad_pes(formato);
-    leidas->inicio = calloc((size_t)programas->pes + 1, sizeof *leidas->inicio);
-    if (!leidas->inicio) {
+// El PE{fila}{columna}.txt de un PE, en sus propias Leidas.
+static int leer_archivo_pe(const char *directorio, const FormatoCGRA *formato, uint32_t pe, Leidas *leidas) {
+    char id[LARGO_PE_ID], archivo[LARGO_PE_ID + 4];
+    generar_pe_id(id, formato, pe);
+    snprintf(archivo, sizeof archivo, "%s.txt", id);
+    char *ruta = unir_ruta(directorio, archivo);
+    if (!ruta) {
         anotar_error("Sin memoria para cargar los programas");
         return -1;
     }
-    for (uint32_t pe = 0; pe < programas->pes; ++pe) {
-        char id[LARGO_PE_ID], archivo[LARGO_PE_ID + 4];
-        generar_pe_id(id, formato, pe);
-        snprintf(archivo, sizeof archivo, "%s.txt", id);
-        char *ruta = unir_ruta(directorio, archivo);
-        if (!ruta) {
-            anotar_error("Sin memoria para cargar los programas");
-            return -1;
+    struct stat info;
+    int resultado;
+    if (stat(ruta, &info) != 0 || !S_ISREG(info.st_mode)) {
+        anotar_error("No existe %s", ruta);
+        resultado = -1;
+    } else {
+        resultado = leer_programa_pe(leidas, ruta);
+    }
+    free(ruta);
+    return resultado;
+}
+
+// Los archivos son independientes, así que con OpenMP se leen en paralelo,
+// cada PE en su propia entrada de leidas. Si fallan varios, el error es el
+// del primer PE, el mismo que da la lectura en orden (y Python), sin
+// importar qué hilo terminó último.
+int leer_programas(const char *directorio, const FormatoCGRA *formato, Programas *programas) {
+    memset(programas, 0, sizeof *programas);
+    uint32_t pes = programas->pes = cantidad_pes(formato);
+    Leidas *leidas = programas->leidas = calloc(pes ? pes : 1, sizeof *leidas);
+    char **errores = calloc(pes ? pes : 1, sizeof *errores);
+    int *fallos = calloc(pes ? pes : 1, sizeof *fallos);
+    int resultado = leidas && errores && fallos ? 0 : -1;
+    if (resultado != 0) {
+        anotar_error("Sin memoria para cargar los programas");
+    } else {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+        for (uint32_t pe = 0; pe < pes; ++pe) {
+            if (leer_archivo_pe(directorio, formato, pe, &leidas[pe]) != 0) {
+                fallos[pe] = 1;
+                errores[pe] = strdup(ultimo_error());   // el mensaje es de este hilo
+            }
         }
-        struct stat info;
-        int resultado = 0;
-        if (stat(ruta, &info) != 0 || !S_ISREG(info.st_mode)) {
-            anotar_error("No existe %s", ruta);
-            resultado = -1;
-        } else {
-            leidas->inicio[pe] = leidas->cantidad;
-            resultado = leer_programa_pe(leidas, ruta);
-        }
-        free(ruta);
-        if (resultado != 0) {
-            return -1;
+        for (uint32_t pe = 0; resultado == 0 && pe < pes; ++pe) {
+            if (fallos[pe]) {
+                anotar_error("%s", errores[pe] ? errores[pe] : "Sin memoria para cargar los programas");
+                resultado = -1;
+            }
         }
     }
-    leidas->inicio[programas->pes] = leidas->cantidad;
-    return 0;
+    for (uint32_t pe = 0; errores && pe < pes; ++pe) {
+        free(errores[pe]);
+    }
+    free(errores);
+    free(fallos);
+    return resultado;
 }
 
 // ---------------------------------------------------------------- validación
@@ -264,11 +294,11 @@ int leer_programas(const char *directorio, const FormatoCGRA *formato, Programas
 // Todos los PEs deben tener los ciclos 0, 1, 2... del primero. Recién
 // entonces se pasan las instrucciones a por_pe, ubicadas por ciclo.
 static int ordenar_por_ciclo(Programas *programas, const FormatoCGRA *formato) {
-    Leidas *leidas = &programas->leidas;
-    size_t cantidad = leidas->inicio[1] - leidas->inicio[0];
+    Leidas *leidas = programas->leidas;
+    size_t cantidad = leidas[0].cantidad;
     uint64_t mayor = 0;
-    for (size_t i = leidas->inicio[0]; i < leidas->inicio[1]; ++i) {
-        mayor = leidas->ciclos[i] > mayor ? leidas->ciclos[i] : mayor;
+    for (size_t k = 0; k < cantidad; ++k) {
+        mayor = leidas[0].ciclos[k] > mayor ? leidas[0].ciclos[k] : mayor;
     }
     // Los ciclos de un archivo son distintos entre sí, así que forman
     // 0..mayor exactamente cuando hay mayor + 1 de ellos.
@@ -277,9 +307,9 @@ static int ordenar_por_ciclo(Programas *programas, const FormatoCGRA *formato) {
         return -1;
     }
     for (uint32_t pe = 1; pe < programas->pes; ++pe) {
-        int igual = leidas->inicio[pe + 1] - leidas->inicio[pe] == cantidad;
-        for (size_t i = leidas->inicio[pe]; igual && i < leidas->inicio[pe + 1]; ++i) {
-            igual = leidas->ciclos[i] < cantidad;
+        int igual = leidas[pe].cantidad == cantidad;
+        for (size_t k = 0; igual && k < cantidad; ++k) {
+            igual = leidas[pe].ciclos[k] < cantidad;
         }
         if (!igual) {
             char id[LARGO_PE_ID];
@@ -299,16 +329,16 @@ static int ordenar_por_ciclo(Programas *programas, const FormatoCGRA *formato) {
     }
     for (uint32_t pe = 0; pe < programas->pes; ++pe) {
         for (size_t k = 0; k < cantidad; ++k) {
-            size_t i = leidas->inicio[pe] + k;
-            programas->por_pe[(size_t)pe * cantidad + leidas->ciclos[i]] = leidas->instrucciones[i];
-            programas->orden_archivo[(size_t)pe * cantidad + k] = (uint32_t)leidas->ciclos[i];
+            uint64_t ciclo = leidas[pe].ciclos[k];
+            programas->por_pe[(size_t)pe * cantidad + ciclo] = leidas[pe].instrucciones[k];
+            programas->orden_archivo[(size_t)pe * cantidad + k] = (uint32_t)ciclo;
         }
+        // Las instrucciones (y sus textos) ahora son de por_pe.
+        free(leidas[pe].instrucciones);
+        free(leidas[pe].ciclos);
     }
-    // Las instrucciones (y sus textos) ahora son de por_pe.
-    free(leidas->instrucciones);
-    free(leidas->ciclos);
-    free(leidas->inicio);
-    memset(leidas, 0, sizeof *leidas);
+    free(leidas);
+    programas->leidas = NULL;
     return 0;
 }
 
@@ -491,13 +521,15 @@ int validar_programas(Programas *programas, const FormatoCGRA *formato, Memoria 
 }
 
 void liberar_programas(Programas *programas) {
-    Leidas *leidas = &programas->leidas;
-    for (size_t i = 0; i < leidas->cantidad; ++i) {
-        liberar_instruccion(&leidas->instrucciones[i]);
+    for (uint32_t pe = 0; programas->leidas && pe < programas->pes; ++pe) {
+        Leidas *leidas = &programas->leidas[pe];
+        for (size_t i = 0; i < leidas->cantidad; ++i) {
+            liberar_instruccion(&leidas->instrucciones[i]);
+        }
+        free(leidas->instrucciones);
+        free(leidas->ciclos);
     }
-    free(leidas->instrucciones);
-    free(leidas->ciclos);
-    free(leidas->inicio);
+    free(programas->leidas);
     for (size_t i = 0; programas->por_pe && i < (size_t)programas->pes * programas->ciclos; ++i) {
         liberar_instruccion(&programas->por_pe[i]);
     }
