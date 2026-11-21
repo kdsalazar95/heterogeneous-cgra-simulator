@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Toma las muestras de tiempo del simulador en C (skill 07).
+# Toma las muestras de tiempo del simulador en C (skill 07)
 #
 #   perfilar.sh <variante> <binario> <programa> <cgra.json> [muestras=120]
 #
-# variante nombra el build (O0, O2...) y va como última columna del CSV.
+# variante nombra el build (O0, O2...) y va como ultima columna del CSV.
 # Los resultados quedan en cgra/c/perfilado/:
 #
 #   <programa>_<filas>x<columnas>_<variante>.csv   una línea por muestra
 #   entorno.txt                                    laptop, compilador, commit, entradas
 #
-# No cambia el gobernador de la CPU ni los archivos de entrada: el reporte
-# de cada corrida va a una carpeta temporal.
+# No cambia el masterde la CPU ni los archivos de entrada: el reporte
+# de cada corrida va a una carpeta temporal
 set -euo pipefail
 
 error() {
@@ -80,8 +80,10 @@ done
     echo "             $(sha256sum "$binario" | cut -d' ' -f1)"
     echo "OPT:         ${OPT:-no declarado (registrar los flags con los que se compiló el binario)}"
     echo "Muestras:    $muestras, después de 5 corridas de calentamiento"
-    echo "--- Compilador (${CC:-cc})"
-    "${CC:-cc}" --version 2>/dev/null | head -1 || echo "no disponible"
+    if [[ -n ${CC-cc} ]]; then
+        echo "--- Compilador (${CC-cc})"
+        "${CC-cc}" --version 2>/dev/null | head -1 || echo "no disponible"
+    fi
     echo "--- $config"
     cat "$config"
     echo

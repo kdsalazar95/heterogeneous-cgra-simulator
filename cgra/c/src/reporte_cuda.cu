@@ -12,6 +12,10 @@ extern "C" {
 #include "texto.h"
 }
 
+extern "C" void iniciar_contexto_cuda(void) {
+    cudaFree(0);
+}
+
 #define COLUMNAS_POR_TABLA 4   // COLUMNAS_POR_TABLA_DE_CICLO de reporte.c
 
 // Textos uno tras otro; el i-ésimo empieza en inicio[i] y termina en '\0'.

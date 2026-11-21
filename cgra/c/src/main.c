@@ -24,6 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+#include <pthread.h>
+#endif
 
 #include "configuracion.h"
 #include "error.h"
@@ -35,6 +38,10 @@
 #include "salida.h"
 #include "texto.h"
 #include "traza.h"
+
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+void iniciar_contexto_cuda(void);
+#endif
 
 #define CARPETA_PROGRAMAS CGRA_RAIZ "/programas"
 #define FUENTE_OPERACIONES CGRA_RAIZ "/operaciones/operaciones.c"
@@ -102,6 +109,14 @@ static void sin_memoria(void) {
     fputs("Sin memoria\n", stderr);
     exit(1);
 }
+
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+static void *hilo_iniciar_contexto_cuda(void *argumento) {
+    (void)argumento;
+    iniciar_contexto_cuda();
+    return NULL;
+}
+#endif
 
 // ------------------------------------------------------------------ rutas
 
@@ -336,14 +351,27 @@ static int ejecutar(const Argumentos *a, const char *nombre, Corrida *c) {
         return no_se_pudo_cargar();
     }
     c->perfil.memoria_ns = ahora_ns() - t;
+
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+    pthread_t hilo_contexto_cuda;
+    // Si no se puede crear el hilo, la primera llamada de E5 inicia CUDA.
+    int contexto_en_hilo = pthread_create(&hilo_contexto_cuda, NULL, hilo_iniciar_contexto_cuda, NULL) == 0;
+#endif
+
     t = ahora_ns();
     if (leer_programas(c->ruta_instrucciones, &c->formato, &c->programas) != 0) {
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+        if (contexto_en_hilo) pthread_join(hilo_contexto_cuda, NULL);
+#endif
         return no_se_pudo_cargar();
     }
     c->perfil.programas_ns = ahora_ns() - t;
     t = ahora_ns();
     resultado = validar_programas(&c->programas, &c->formato, &c->memoria);
     if (resultado != 0) {
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+        if (contexto_en_hilo) pthread_join(hilo_contexto_cuda, NULL);
+#endif
         return resultado == ERROR_EJECUCION ? ERROR_EJECUCION : no_se_pudo_cargar();
     }
     c->perfil.validacion_ns = ahora_ns() - t;
@@ -356,11 +384,17 @@ static int ejecutar(const Argumentos *a, const char *nombre, Corrida *c) {
     Traza *traza = NULL;
     if (a->traza && mostrar) {
         if (crear_traza(&c->traza, c->programas.ciclos, c->programas.pes) != 0) {
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+            if (contexto_en_hilo) pthread_join(hilo_contexto_cuda, NULL);
+#endif
             return ERROR_EJECUCION;
         }
         traza = &c->traza;
     }
     if (ejecutar_cgra(&c->programas, &c->formato, &c->memoria, traza, &c->perfil) != 0) {
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+        if (contexto_en_hilo) pthread_join(hilo_contexto_cuda, NULL);
+#endif
         return ERROR_EJECUCION;
     }
     if (traza && !a->ciclos) {
@@ -373,6 +407,12 @@ static int ejecutar(const Argumentos *a, const char *nombre, Corrida *c) {
     // 4. Reportar (E5). El reporte de ciclos se guarda en todas las
     //    corridas, en la carpeta del programa, y se reescribe en la
     //    siguiente. Con --ciclos además se muestra.
+#ifdef CGRA_CUDA_CONTEXTO_ASINCRONO
+    if (contexto_en_hilo && pthread_join(hilo_contexto_cuda, NULL) != 0) {
+        anotar_error("No se pudo unir el hilo del contexto CUDA");
+        return ERROR_EJECUCION;
+    }
+#endif
     t = ahora_ns();
     if (armar_reporte(&c->reporte, &c->programas, &c->formato, &c->memoria, c->carpeta, traza) != 0) {
         return ERROR_EJECUCION;
