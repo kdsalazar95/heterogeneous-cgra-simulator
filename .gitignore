@@ -42,3 +42,8 @@ cgra/c/test/equivalence.py
 # Simulador en Python: solo local, el repo usa la versión en C
 cgra/src/*.py
 cgra/test/
+cgra/fpga/proy_v*/
+cgra/fpga/vivado_v*/
+cgra/fpga/*.log
+cgra/fpga/*.jou
+cgra/fpga/.Xil/
