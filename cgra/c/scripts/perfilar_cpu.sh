@@ -2,7 +2,11 @@
 # Línea base de CPU para comparar con la GPU: mide los 3 programas en todas
 # las mallas de Programas_PEs/ con perfilar.sh.
 #
-#   perfilar_cpu.sh [muestras=120]
+#   perfilar_cpu.sh [muestras=120] [variante=O2]
+#
+# variante nombra los CSV (p. ej. CPU_E2). OPENMP=-fopenmp (por defecto)
+# lee los PE*.txt en paralelo; OPENMP= compila la versión secuencial. El
+# número de hilos se elige con OMP_NUM_THREADS (por defecto, los núcleos).
 #
 # Descomprime los zips en cgra/c/perfilado/entradas/<malla>/ y, como solo el
 # de 32x32 trae cgra.json, arma el de cada malla cambiando filas y columnas
@@ -10,15 +14,17 @@
 set -euo pipefail
 
 muestras=${1:-120}
+variante=${2:-O2}
 c=$(cd "$(dirname "$0")/.." && pwd)    # cgra/c
 repo=$(cd "$c/../.." && pwd)
 entradas=$c/perfilado/entradas
 export CC=${CC:-$HOME/micromamba/envs/cuda/bin/x86_64-conda-linux-gnu-gcc}
 export OPT=-O2
+OPENMP=${OPENMP--fopenmp}
 
 # Compilar el simulador (no hay make en el sistema).
 mkdir -p "$c/build"
-$CC -std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L $OPT -ffp-contract=off \
+$CC -std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L $OPT $OPENMP -ffp-contract=off \
     -I"$c/include" -DCGRA_RAIZ="\"$repo/cgra\"" "$c"/src/*.c -o "$c/build/cgra" -lm
 
 # Solo el zip de 32x32 trae memoria.bin. No depende de la malla: se genera
@@ -49,6 +55,6 @@ for zip in "$repo"/Programas_PEs/pe_programas_*.zip; do
         carpeta=$(find "$destino" -type d -path "*/$programa" | head -1)
         [[ -f $carpeta/memoria.bin ]] || cp "$memorias/$programa/memoria.bin" "$carpeta/"
         echo "== $programa $malla" >&2
-        "$c/scripts/perfilar.sh" O2 "$c/build/cgra" "$carpeta" "$destino/cgra.json" "$muestras"
+        "$c/scripts/perfilar.sh" "$variante" "$c/build/cgra" "$carpeta" "$destino/cgra.json" "$muestras"
     done
 done
