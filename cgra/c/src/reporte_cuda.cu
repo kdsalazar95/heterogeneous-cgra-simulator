@@ -1,4 +1,9 @@
 // Versión GPU del bucle de seccion_ciclos() de reporte.c: un hilo por ciclo.
+//
+// Variantes de compilación:
+//   (ninguna)  O1: copias explícitas H2D/D2H.
+//   CGRA_O2    O2: crea el contexto CUDA con iniciar_contexto_cuda(), llamada desde un hilo.
+//   CGRA_O3    O3: buffers en memoria mapeada (zero-copy); requiere CGRA_O2.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -156,6 +161,18 @@ __global__ void escribir_ciclos(DatosCiclos d, const size_t *inicio, char *salid
     if (ciclo < d.ciclos) escribir_ciclo(d, ciclo, salida + inicio[ciclo]);
 }
 
+#ifdef CGRA_O2
+// Crea el contexto CUDA; main.c la llama desde un hilo mientras se leen los programas.
+extern "C" void iniciar_contexto_cuda(void) {
+#ifdef CGRA_O3
+    cudaSetDeviceFlags(cudaDeviceMapHost);
+#endif
+    cudaFree(0);
+}
+#endif
+
+#ifndef CGRA_O3
+
 // Copia a la GPU una lista de textos, uno tras otro.
 static Textos subir(char **textos, size_t cantidad) {
     size_t *inicio = (size_t *)malloc(cantidad * sizeof *inicio), total = 0;
@@ -257,3 +274,145 @@ extern "C" int seccion_ciclos_gpu(Lineas *lineas, const Programas *p, const Form
     agregar_linea_propia(lineas, salida);
     return 0;
 }
+
+#else
+
+// Memoria mapeada
+
+#define MAX_RESERVAS 16
+static void *reservas[MAX_RESERVAS];
+static int num_reservas = 0;
+
+// Reserva memoria mapeada. Devuelve el puntero del host y deja en *dispositivo
+// el puntero equivalente para el kernel. NULL si falla.
+template <typename T>
+static T *reservar(T **dispositivo, size_t cantidad) {
+    void *host = NULL;
+    size_t bytes = cantidad * sizeof(T);
+    if (num_reservas == MAX_RESERVAS) return NULL;
+    if (cudaHostAlloc(&host, bytes ? bytes : 1, cudaHostAllocMapped) != cudaSuccess) return NULL;
+    reservas[num_reservas++] = host;
+    if (cudaHostGetDevicePointer((void **)dispositivo, host, 0) != cudaSuccess) return NULL;
+    return (T *)host;
+}
+
+static void liberar_reservas(void) {
+    while (num_reservas) cudaFreeHost(reservas[--num_reservas]);
+}
+
+// Deja una lista de textos, uno tras otro, en memoria mapeada. 0 ok, -1 error.
+static int subir(Textos *gpu, char **textos, size_t cantidad) {
+    size_t total = 0;
+    for (size_t i = 0; i < cantidad; ++i) total += strlen(textos[i]) + 1;
+    char *datos = reservar(&gpu->datos, total);
+    size_t *inicio = reservar(&gpu->inicio, cantidad);
+    if (!datos || !inicio) return -1;
+    size_t pos = 0;
+    for (size_t i = 0; i < cantidad; ++i) {
+        size_t n = strlen(textos[i]) + 1;
+        inicio[i] = pos;
+        memcpy(datos + pos, textos[i], n);
+        pos += n;
+    }
+    return 0;
+}
+
+// Agrega a lineas el detalle de todos los ciclos, igual que el bucle de
+// seccion_ciclos(), como una sola línea con '\n' adentro. 0 ok, -1 error.
+extern "C" int seccion_ciclos_gpu(Lineas *lineas, const Programas *p, const FormatoCGRA *f) {
+    DatosCiclos d = {f->filas, f->columnas, p->pes, p->ciclos};
+    size_t total = (size_t)p->pes * p->ciclos;
+    if (!total) return 0;
+
+    const char *fallo = NULL;
+    const char *sin_memoria = "no se pudo reservar memoria compartida CPU-GPU (cudaHostAlloc)";
+    int *op = NULL, *dir = NULL;
+    size_t *largo = NULL, *d_largo = NULL, bytes = 0;
+    char *salida = NULL, *d_salida = NULL, *copia = NULL;
+    char **instrucciones = NULL, **celdas = NULL, **envios = NULL;
+    char id[LARGO_PE_ID], receptor[LARGO_PE_ID];
+    uint32_t hilos = 128, bloques = (p->ciclos + hilos - 1) / hilos;
+    cudaError_t cuda;
+
+    // Si el contexto ya existe devuelve cudaErrorSetOnActiveProcess.
+    cuda = cudaSetDeviceFlags(cudaDeviceMapHost);
+    if (cuda == cudaErrorSetOnActiveProcess) cudaGetLastError();
+
+    // Buffers compartidos.
+    op = reservar(&d.op, total);
+    dir = reservar(&d.dir, total);
+    largo = reservar(&d_largo, p->ciclos);   // largo de cada ciclo, luego su inicio
+    if (!op || !dir || !largo) { fallo = sin_memoria; goto fin; }
+
+    instrucciones = (char **)malloc(total * sizeof(char *));
+    celdas = (char **)calloc(p->pes, sizeof(char *));
+    envios = (char **)calloc((size_t)p->pes * 4, sizeof(char *));
+    if (!instrucciones || !celdas || !envios) { fallo = "sin memoria"; goto fin; }
+
+    for (size_t i = 0; i < total; ++i) {
+        op[i] = p->por_pe[i].op;
+        dir[i] = p->por_pe[i].dir;
+        instrucciones[i] = p->por_pe[i].texto ? p->por_pe[i].texto : (char *)"";
+    }
+    for (uint32_t pe = 0; pe < p->pes; ++pe) {
+        generar_pe_id(id, f, pe);
+        celdas[pe] = nuevo_texto("%s (%s): ", id, tipo_del_pe(f, pe)->nombre);
+        for (int k = 0; k < 4; ++k) {
+            int64_t v = vecino(f, pe, (Direccion)k);
+            if (v >= 0) generar_pe_id(receptor, f, (uint32_t)v);
+            envios[(size_t)pe * 4 + k] =
+                v >= 0 ? nuevo_texto("%s -> %s (%s)", id, receptor, DIRECCION_EN_ESPANOL[k]) : nuevo_texto("%s", "");
+        }
+    }
+    if (subir(&d.instruccion, instrucciones, total) || subir(&d.celda, celdas, p->pes) ||
+        subir(&d.envio, envios, (size_t)p->pes * 4)) {
+        fallo = sin_memoria;
+        goto fin;
+    }
+
+    // Pasada 1: el largo de cada ciclo.
+    medir_ciclos<<<bloques, hilos>>>(d, d_largo);
+    cuda = cudaGetLastError();
+    if (cuda == cudaSuccess) cuda = cudaDeviceSynchronize();
+    if (cuda != cudaSuccess) { fallo = cudaGetErrorString(cuda); goto fin; }
+    for (uint32_t c = 0; c < p->ciclos; ++c) {
+        size_t este = largo[c];
+        largo[c] = bytes;      // ahora es el inicio del ciclo c
+        bytes += este;
+    }
+
+    // Pasada 2: cada hilo escribe su ciclo en su lugar.
+    salida = reservar(&d_salida, bytes + 1);
+    if (!salida) { fallo = sin_memoria; goto fin; }
+    escribir_ciclos<<<bloques, hilos>>>(d, d_largo, d_salida);
+    cuda = cudaGetLastError();
+    if (cuda == cudaSuccess) cuda = cudaDeviceSynchronize();
+    if (cuda != cudaSuccess) { fallo = cudaGetErrorString(cuda); goto fin; }
+
+    // guardar_lineas() agrega el '\n' de la última línea. agregar_linea_propia()
+    // libera el texto con free(), por eso se entrega una copia.
+    salida[bytes ? bytes - 1 : 0] = '\0';
+    copia = (char *)malloc(bytes ? bytes : 1);
+    if (!copia) { fallo = "sin memoria"; goto fin; }
+    memcpy(copia, salida, bytes ? bytes : 1);
+
+fin:
+    liberar_reservas();
+    if (celdas && envios) {
+        for (uint32_t pe = 0; pe < p->pes; ++pe) {
+            free(celdas[pe]);
+            for (int k = 0; k < 4; ++k) free(envios[(size_t)pe * 4 + k]);
+        }
+    }
+    free(instrucciones); free(celdas); free(envios);
+
+    if (fallo) {
+        free(copia);
+        anotar_error("Error de CUDA en el reporte: %s", fallo);
+        return -1;
+    }
+    agregar_linea_propia(lineas, copia);
+    return 0;
+}
+
+#endif  // CGRA_O3

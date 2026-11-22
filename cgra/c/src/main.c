@@ -24,6 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#if defined(CGRA_GPU) && defined(CGRA_O2)
+#include <pthread.h>
+#endif
 
 #include "configuracion.h"
 #include "error.h"
@@ -35,6 +38,19 @@
 #include "salida.h"
 #include "texto.h"
 #include "traza.h"
+
+#if defined(CGRA_GPU) && defined(CGRA_O2)
+// El contexto CUDA se crea en un hilo mientras E2 lee los PE*.txt.
+void iniciar_contexto_cuda(void);
+static pthread_t hilo_contexto;
+static int hilo_contexto_activo;
+
+static void *crear_contexto(void *arg) {
+    (void)arg;
+    iniciar_contexto_cuda();
+    return NULL;
+}
+#endif
 
 #define CARPETA_PROGRAMAS CGRA_RAIZ "/programas"
 #define FUENTE_OPERACIONES CGRA_RAIZ "/operaciones/operaciones.c"
@@ -336,6 +352,9 @@ static int ejecutar(const Argumentos *a, const char *nombre, Corrida *c) {
         return no_se_pudo_cargar();
     }
     c->perfil.memoria_ns = ahora_ns() - t;
+#if defined(CGRA_GPU) && defined(CGRA_O2)
+    hilo_contexto_activo = pthread_create(&hilo_contexto, NULL, crear_contexto, NULL) == 0;
+#endif
     t = ahora_ns();
     if (leer_programas(c->ruta_instrucciones, &c->formato, &c->programas) != 0) {
         return no_se_pudo_cargar();
@@ -374,6 +393,12 @@ static int ejecutar(const Argumentos *a, const char *nombre, Corrida *c) {
     //    corridas, en la carpeta del programa, y se reescribe en la
     //    siguiente. Con --ciclos además se muestra.
     t = ahora_ns();
+#if defined(CGRA_GPU) && defined(CGRA_O2)
+    if (hilo_contexto_activo) {
+        pthread_join(hilo_contexto, NULL);
+        hilo_contexto_activo = 0;
+    }
+#endif
     if (armar_reporte(&c->reporte, &c->programas, &c->formato, &c->memoria, c->carpeta, traza) != 0) {
         return ERROR_EJECUCION;
     }

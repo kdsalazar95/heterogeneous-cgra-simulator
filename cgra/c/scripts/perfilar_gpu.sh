@@ -2,10 +2,10 @@
 # Mide cgra_gpu en todas las mallas con perfilar.sh, igual que perfilar_cpu.sh,
 # y guarda el desglose de E4 de cada muestra en <programa>_<malla>_GPU_desglose.csv.
 #
-#   perfilar_gpu.sh [muestras=120] [variante=GPU]
+#   [BIN=build/cgra_gpu_o1] perfilar_gpu.sh [muestras=120] [variante=GPU]
 #
-# Compila con compilar_gpu.sh, que toma CC, CXX, NVCC, ARCH y CUDA_LIB del
-# entorno (por defecto, la Jetson Nano).
+# Sin BIN compila con compilar_gpu.sh, que toma CC, CXX, NVCC, ARCH y CUDA_LIB
+# del entorno (por defecto, la Jetson Nano). Con BIN usa ese binario tal cual.
 set -euo pipefail
 
 muestras=${1:-120}
@@ -15,7 +15,10 @@ salida=$c/perfilado
 mkdir -p "$salida"
 
 # Antes de cambiar CC: compilar_gpu.sh lo usa para los .c.
-"$c/scripts/compilar_gpu.sh" > /dev/null
+if [[ -z ${BIN:-} ]]; then
+    "$c/scripts/compilar_gpu.sh" > /dev/null
+fi
+binario=$(realpath "${BIN:-$c/build/cgra_gpu}")
 
 # Para entorno.txt (perfilar.sh registra CC y OPT).
 export CC=${NVCC:-/usr/local/cuda/bin/nvcc}
@@ -43,13 +46,18 @@ for destino in "$c"/perfilado/entradas/*x*; do
         export CGRA_DESGLOSE_E5=$desglose_e5.tmp
         rm -f "$CGRA_DESGLOSE_GPU" "$CGRA_DESGLOSE_E5"
         echo "== $programa $malla" >&2
-        "$c/scripts/perfilar.sh" "$variante" "$c/build/cgra_gpu" "$carpeta" "$destino/cgra.json" "$muestras"
+        "$c/scripts/perfilar.sh" "$variante" "$binario" "$carpeta" "$destino/cgra.json" "$muestras"
 
         # Las 5 primeras líneas son del calentamiento de perfilar.sh.
-        echo "muestra,contexto_ns,h2d_ns,kernels_ns,d2h_ns" > "$desglose"
-        tail -n +6 "$CGRA_DESGLOSE_GPU" | awk '{print NR "," $0}' >> "$desglose"
+        # Solo hay desglose de E4 si el binario ejecuta E4 en la GPU.
+        if [[ -f $CGRA_DESGLOSE_GPU ]]; then
+            echo "muestra,contexto_ns,h2d_ns,kernels_ns,d2h_ns" > "$desglose"
+            tail -n +6 "$CGRA_DESGLOSE_GPU" | awk '{print NR "," $0}' >> "$desglose"
+        fi
         echo "muestra,conteo_ns,encabezado_ns,distribucion_ns,actividad_ns,ciclos_ns,memoria_final_ns" > "$desglose_e5"
-        tail -n +6 "$CGRA_DESGLOSE_E5" | awk '{print NR "," $0}' >> "$desglose_e5"
+        if [[ -f $CGRA_DESGLOSE_E5 ]]; then
+            tail -n +6 "$CGRA_DESGLOSE_E5" | awk '{print NR "," $0}' >> "$desglose_e5"
+        fi
         rm -f "$CGRA_DESGLOSE_GPU" "$CGRA_DESGLOSE_E5"
     done
 done

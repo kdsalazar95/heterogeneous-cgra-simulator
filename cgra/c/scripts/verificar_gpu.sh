@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Compara cgra (CPU) con cgra_gpu en todas las mallas: salida, reporte y
 # memoria final tienen que ser idénticos. Usa las entradas de perfilar_cpu.sh.
+# BIN elige el binario GPU (por defecto build/cgra_gpu).
 set -uo pipefail
 
 c=$(cd "$(dirname "$0")/.." && pwd)    # cgra/c
+binario_gpu=$(realpath "${BIN:-$c/build/cgra_gpu}")
 temporal=$(mktemp -d)
 trap 'rm -rf "$temporal"' EXIT
 iguales=0
@@ -24,7 +26,7 @@ for destino in "$c"/perfilado/entradas/*x*; do
         carpeta=$(find "$destino" -type d -path "*/$programa" | head -1)
         rm -rf "$temporal"/*
         correr "$c/build/cgra" "$carpeta" "$destino/cgra.json" "$temporal/cpu"
-        correr "$c/build/cgra_gpu" "$carpeta" "$destino/cgra.json" "$temporal/gpu"
+        correr "$binario_gpu" "$carpeta" "$destino/cgra.json" "$temporal/gpu"
         if diff -r "$temporal/cpu" "$temporal/gpu" > /dev/null; then
             echo "igual     $programa $malla"
             iguales=$((iguales + 1))
