@@ -16,11 +16,13 @@ MODO=${MODO:-hw}
 VARIANTE=${VARIANTE:-2}
 CC=${CC:-gcc}
 CXX=${CXX:-g++}
+# E2 (lectura de los PE*.txt) en paralelo, igual que el Makefile. OPENMP= compila E2 secuencial.
+OPENMP=${OPENMP--fopenmp}
 obj=$c/build/fpga_${MODO}_v$VARIANTE
 mkdir -p "$obj"
 
 # Los mismos flags que el Makefile (sin -ffp-contract el resultado no coincide con Python).
-flags=(-std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L -O2 -ffp-contract=off -I"$c/include" -I"$fpga"
+flags=(-std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L -O2 -ffp-contract=off $OPENMP -I"$c/include" -I"$fpga"
        -DCGRA_RAIZ="\"$raiz\"")
 for f in "$c"/src/*.c; do
     [[ $(basename "$f") == malla.c ]] && continue
@@ -32,11 +34,11 @@ if [[ $MODO == hw ]]; then
     sufijo=""; omp=()
     if [[ ${OMP:-0} == 1 ]]; then sufijo=_omp; omp=(-fopenmp -DCGRA_FPGA_OMP); fi
     $CC "${flags[@]}" "${omp[@]}" -DCGRA_FPGA_HW -c "$fpga/malla_fpga.c" -o "$obj/malla_fpga.o"
-    $CC "${omp[@]}" "$obj"/*.o -o "$c/build/cgra_fpga$sufijo" -L/usr/lib -lxrt_core -lm
+    $CC $OPENMP "${omp[@]}" "$obj"/*.o -o "$c/build/cgra_fpga$sufijo" -L/usr/lib -lxrt_core -lm
     echo "$c/build/cgra_fpga$sufijo"
 else
     $CC "${flags[@]}" -c "$fpga/malla_fpga.c" -o "$obj/malla_fpga.o"
     $CXX -std=c++14 -O2 -ffp-contract=off -DVARIANTE="$VARIANTE" -I"$fpga" -c "$fpga/cgra_hls.cpp" -o "$obj/cgra_hls.o"
-    $CXX "$obj"/*.o -o "$c/build/cgra_fpga_sw_v$VARIANTE" -lm
+    $CXX $OPENMP "$obj"/*.o -o "$c/build/cgra_fpga_sw_v$VARIANTE" -lm
     echo "$c/build/cgra_fpga_sw_v$VARIANTE"
 fi
