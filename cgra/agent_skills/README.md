@@ -1,0 +1,194 @@
+# Agent Skill Pipeline: Mesh Scheduler
+
+Use these skills in order to transform every operation of the supported C
+source into per-PE instruction files for a `filas x columnas` processing-element mesh, plus
+the initial memory those programs run on (`memoria.bin`).
+
+The supported operations are `reduccion`, `matmul` and `convolucion`, all in
+one source, `operaciones/operaciones.c`. Their sizes come from the `#define`
+constants of each operation, every run compiles all of them (the
+`OPERACIONES` table of `operaciones.c`), and the CGRA (mesh size, memory size and the
+type of every PE) comes from `src/cgra.json`, the same file the simulator in C
+(`c/build/cgra`) reads (see [Receive Inputs](01-receive-inputs.md)).
+
+The CGRA behaves like a processor: it is never told which operation it runs.
+The pipeline is the compiler. It turns the source into one program per PE
+(skill 08), and running the source once produces the initial memory:
+`inicializar_<operacion>()` fills the operation's arrays and saves them to
+`programas/<operacion>/memoria.bin` (skill 02). The simulator only loads those two
+things and executes them.
+
+Scheduling improvements belong to this compiler, not to the simulator's
+execution core. Compare complete schedules globally while preserving tile
+membership, contiguous blocks and their assignment in rounds (skill 06,
+[Global Selection Within Fixed Tiles](06-map-to-mesh.md#global-selection-within-fixed-tiles)).
+
+When the user asks the agent to arrange PE types for a mesh size, skill 01
+handles [PE placement](01-receive-inputs.md#designing-pe-placement-when-requested)
+using skill 06's [layout and tile rules](06-map-to-mesh.md#layout-and-tile-design).
+Preserve the hardware inventory, keep M servers on the west/east borders
+where the shape permits, and select one feasible hardware map for all
+operations before compilation. Ordinary compilation reads the existing map;
+it does not redesign it. Editing these skills alone does not change
+`src/cgra.json` or regenerate programs.
+
+The mesh and the problem do not have to be the same size: the mesh is split
+into tiles (sections of rows that work as small CGRAs) and a larger problem
+is split into blocks handed out to them in rounds (skill 06, Tiles and
+Tiling), and a larger mesh leaves its extra PEs
+in `NOP`. The size is not fixed: every skill builds the CGRA from
+`src/cgra.json`.
+
+## Pipeline
+
+Every mesh size is valid. The small layouts (singleton G, vertical M/C,
+two-column M C, and one/two-row meshes with M at both ends and C interiors)
+are in skill 01 ([Small Meshes](01-receive-inputs.md#small-meshes)); the
+capability checks and scalar remainders in skill 05
+([Feasibility](05-detect-parallelism.md#feasibility)); the routes and tiling
+in skill 06. The simulator's configuration loader (`c/src/configuracion.c`)
+resolves the small layouts when `src/cgra.json` has
+`"adaptar_mallas_pequenas": true`, and skill 07 has their schedules: a small
+mesh is never a reason to stop. Always use the actual simulator map. An
+existing explicit map or concrete distribution must never be silently changed.
+Under the current default distribution, meshes with at least 3 rows and
+3 columns use alternating E/V rows with no C. Skill 01 migrates the selected
+JSON before compilation; C remains only in the existing small adaptations.
+
+Existing files in `programas/<operacion>/` are generated outputs, not inputs
+that prevent compilation. On every invocation, rebuild the IR, graphs, initial
+memory and all PE instruction files from the current C source and
+`src/cgra.json`. Overwrite existing PE files and remove obsolete generated
+`PE*.txt` files as described in skill 08. Changing the mesh, PE types, vector
+width or memory capacity requires recompilation and validation; do not stop
+because the old program targets different hardware. The simulator loads and
+executes these outputs; it does not run this compilation pipeline automatically.
+Before writing an operation, apply the backup/restore procedure in skill 01
+([All Operations](01-receive-inputs.md#all-operations)) so compilation or
+validation failures preserve its previous contents.
+
+The pipeline always compiles **all the operations** of the `OPERACIONES` table,
+never only one. Skill 01 reads the CGRA once and builds the list of operations;
+then skills 02 to 09 run once per operation, one after the other, each in its
+own `programas/<operacion>/`. A failure in one operation does not stop the
+others, and the run ends with one summary line per operation (see
+[Receive Inputs](01-receive-inputs.md#all-operations)).
+
+1. [Receive Inputs](01-receive-inputs.md)
+2. [Generate LLVM IR and Initial Memory](02-generate-llvm-ir.md)
+3. [Generate Graphs](03-generate-graphs.md)
+4. [Parse Program](04-parse-program.md)
+5. [Detect Parallelism](05-detect-parallelism.md)
+6. [Map to Mesh](06-map-to-mesh.md)
+7. [Schedule Instructions](07-schedule-instructions.md)
+8. [Generate PE Files](08-generate-pe-files.md)
+9. [Validate Schedule](09-validate-schedule.md)
+
+## The Simulator
+
+The pipeline uses the simulator in C, in `c/`. Build it once (and again if its
+code changes); every command below runs from `cgra/`:
+
+```sh
+make -C c                          # builds c/build/cgra
+c/build/cgra --mapa                # mesh, PE type map and legend of src/cgra.json (skill 01)
+c/build/cgra <operacion>           # loads, validates and runs a compiled program (skill 09)
+c/build/cgra todas                 # validates and runs every program; exit 1 if any fails (skill 09)
+```
+
+## Default Commands
+
+From `programas/<operacion>/`:
+
+```sh
+clang-18 -S -emit-llvm ../../operaciones/operaciones.c -o operaciones.ll
+clang-18 ../../operaciones/operaciones.c -o operaciones.out && ./operaciones.out <operacion>   # writes memoria.bin
+opt-18 -passes=dot-cfg -disable-output operaciones.ll
+opt-18 -passes=dot-ddg -disable-output operaciones.ll
+```
+
+## PE Types (`src/cgra.json`)
+
+One `PE{fila}{columna}` per position, connected only to its north, south, east,
+and west neighbors. In the standard border layout the west and east columns
+are **memory PEs** (`M`) and the interior PEs compute. Small and explicit
+layouts follow skill 01. The specialized types are:
+
+```text
+M = memoria    the west and east columns; loads/stores scalars and vectors, never computes
+E = escalar    scalar arithmetic only
+V = vectorial  vector arithmetic only
+C = computo    scalar and vector arithmetic (E + V)
+G = generico   memory and scalar compute; vector ISA when configured
+```
+
+The selected large-mesh `distribucion.ciclo_filas` alternates E and V:
+
+```text
+memory PEs:   PE(f, 0) and PE(f, columnas - 1), for every row f
+compute PEs:  PE(f, c) with 1 <= c <= columnas - 2
+
+f mod 2 = 0:  M E E ... E M
+f mod 2 = 1:  M V V ... V M
+```
+
+For at least 3 rows AND 3 columns, no PE is C, even idle or relaying.
+Skill 01 must migrate the old E/V/C configuration and validate the actual
+printed map before regenerating programs. These instructions do not change
+an existing JSON automatically. C is reserved for the existing small-layout
+convention (fewer than 3 rows OR columns); G serves the singleton 1x1.
+See [Small Meshes](01-receive-inputs.md#small-meshes) and the
+[hardware policy](06-map-to-mesh.md#specialized-first-policy).
+
+## Instruction Set per PE Type
+
+```text
+                       memoria (M)  escalar (E)  vectorial (V)  computo (C)
+MOV  reg, imm               x            x            x              x
+LD   reg, mem[index]        x
+ST   mem[index], reg        x
+ADD  dst, src1, src2                     x                           x
+SUB  dst, src1, src2                     x                           x
+MUL  dst, src1, src2                     x                           x
+DIV  dst, src1, src2                     x                           x
+SEND dir, reg               x            x            x              x
+RECV dir, reg               x            x            x              x
+NOP                         x            x            x              x
+LDL  reg, local[index]                   x            x              x
+STL  local[index], reg                   x            x              x
+```
+
+Every PE has 16 scalar registers, `r0` .. `r15` (`rA`, `rB`, `rC`, `rT` and
+`acc` are `r0` .. `r4`). With `palabras_locales` in `src/cgra.json`, every
+compute PE also has its own **local memory** of that many words: `LDL`/`STL`
+(and `VLDL`/`VSTL` for vectors) read and write it with `local[index]`. Only the
+memory PEs access the data memory (`memoria.bin`); a compute PE keeps there
+the data it received and will reuse.
+
+G combines the memory and compute instruction permissions actually configured
+for it. With no vector width it uses only the scalar ISA. Never infer G's
+permissions just from the letter; read its declared or implicit generic type.
+
+When `src/cgra.json` has `ancho_vector` (`W`), compatible vector groups and
+a complete implemented vector plan, the pipeline can select `vectorial` mode
+(skill 01); local G groups use scalar work. In vectorial mode: the vector compute PEs
+do the work in blocks of `W` contiguous elements, and the scalar compute PEs
+(`E`) do, at the same time, what does not fill a block, with the scalar
+instructions above. The vector instructions are:
+
+```text
+                    memoria (M)  vectorial (V)  computo (C)
+VLD  vreg, mem[index]       x                                W contiguous words
+VST  mem[index], vreg       x
+VADD/VSUB/VMUL/VDIV                      x             x     lane by lane
+VREDSUM reg, vreg                        x             x     sum of the W lanes
+VBCAST  vreg, reg                        x             x     a scalar to the W lanes
+VSEND dir, vreg             x            x             x     the whole vector, 1 cycle
+VRECV dir, vreg             x            x             x
+VLDL vreg, local[index]                  x             x     W words of the local memory
+VSTL local[index], vreg                  x             x
+```
+
+Memory-capable PEs load operands and send them to the compute PEs when separate;
+a `G` can load, compute and store locally (skills 05-07). The simulator refuses
+to load a program with an instruction outside the type of its PE.

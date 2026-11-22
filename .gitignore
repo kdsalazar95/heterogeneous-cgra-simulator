@@ -1,0 +1,49 @@
+.venv
+
+__pycache__/
+os
+sys
+.python-version
+historial_busqueda_dijkstra.csv
+historial_entrenamiento.csv
+progreso_entrenamiento.png
+.pytest_cache/
+
+# Todo lo que generan los skills y run_cgra.py: IR, graficas, horarios de los
+# PEs, memorias y reportes (en cgra/programas/). En el repositorio solo queda
+# el codigo fuente (.py, .c, .h) y la documentacion (.md).
+*.ll
+*.dot
+*.json
+*.bin
+*.out
+*.txt
+pe_instructions/
+graphs/
+**/programas/*
+
+# Excepciones: el formato de la CGRA (lo leen Python y los skills) y los
+# datos de prueba
+!**/src/cgra.json
+!**/test/datos/**
+# ...pero los .txt de test/datos no se suben
+**/test/datos/**/*.txt
+
+# C simulator artifacts
+cgra/c/build/
+cgra/c/perfilado/
+cgra/agent_skills_c/
+
+# Herramientas auxiliares locales de perfilado y validación
+cgra/c/scripts/analizar_perfil.py
+cgra/c/scripts/perfilar.py
+cgra/c/test/equivalence.py
+
+# Simulador en Python: solo local, el repo usa la versión en C
+cgra/src/*.py
+cgra/test/
+cgra/fpga/proy_v*/
+cgra/fpga/vivado_v*/
+cgra/fpga/*.log
+cgra/fpga/*.jou
+cgra/fpga/.Xil/

@@ -1,0 +1,518 @@
+
+
+================================================================
+== Synthesis Summary Report of 'cgra_e4'
+================================================================
++ General Information: 
+    * Date:           Thu Nov 19 21:52:30 2026
+    * Version:        2026.1 (Build 6493734 on Jun 16 2026)
+    * Project:        proy_v1
+    * Solution:       sol
+    * Product family: zynquplus
+    * Target device:  xck26-sfvc784-2LV-c
+    
+
+* Performance & Resource Estimates: 
++--------------------------------------+--------+---------------+----------+------------+-------+----------+------------+-----------+-------+---------+---------+-----------+------------+----------+
+|                Modules               |  Issue |               | Iteration|            |  Trip |          |         Latency        |       |         |         |           |            |          |
+|                & Loops               |  Type  | Violation Type|  Latency |  Interval  | Count | Pipelined|  (cycles)  |    (ns)   | Slack |  BRAM   |   DSP   |     FF    |     LUT    |   URAM   |
++--------------------------------------+--------+---------------+----------+------------+-------+----------+------------+-----------+-------+---------+---------+-----------+------------+----------+
+|+ cgra_e4                             |  Timing|              -|         -|  2236962337|      -|        no|  2236962336|  2.237e+10|  -0.21|  21 (7%)|  14 (1%)|  7929 (3%)|  10850 (9%)|  36 (56%)|
+| + cgra_e4_Pipeline_INICIO_REGS       |       -|              -|         -|       16386|      -|       yes|       16386|  1.639e+05|   4.62|        -|        -|   17 (~0%)|    88 (~0%)|         -|
+|  o INICIO_REGS                       |       -|              -|         1|           1|  16384|       yes|       16384|  1.638e+05|   7.30|        -|        -|          -|           -|         -|
+| + cgra_e4_Pipeline_INICIO_VECT       |       -|              -|         -|       32770|      -|       yes|       32770|  3.277e+05|   4.62|        -|        -|   18 (~0%)|    89 (~0%)|         -|
+|  o INICIO_VECT                       |       -|              -|         1|           1|  32768|       yes|       32768|  3.277e+05|   7.30|        -|        -|          -|           -|         -|
+| + cgra_e4_Pipeline_INICIO_LOCAL      |       -|              -|         -|       65538|      -|       yes|       65538|  6.554e+05|   4.62|        -|        -|   19 (~0%)|    90 (~0%)|         -|
+|  o INICIO_LOCAL                      |       -|              -|         1|           1|  65536|       yes|       65536|  6.554e+05|   7.30|        -|        -|          -|           -|         -|
+| + cgra_e4_Pipeline_INICIO_COLAS      |       -|              -|         -|        4098|      -|       yes|        4098|  4.098e+04|   4.62|        -|        -|   15 (~0%)|    86 (~0%)|         -|
+|  o INICIO_COLAS                      |       -|              -|         1|           1|   4096|       yes|        4096|  4.096e+04|   7.30|        -|        -|          -|           -|         -|
+| + cgra_e4_Pipeline_LEER_MEMORIA      |       -|              -|         -|       16387|      -|       yes|       16387|  1.639e+05|   0.00|        -|        -|  115 (~0%)|   110 (~0%)|         -|
+|  o LEER_MEMORIA                      |       -|              -|         3|           1|  16384|       yes|       16385|  1.638e+05|   7.30|        -|        -|          -|           -|         -|
+| + cgra_e4_Pipeline_ESCRIBIR_MEMORIA  |       -|              -|         -|       16387|      -|       yes|       16387|  1.639e+05|   0.00|        -|        -|   84 (~0%)|   110 (~0%)|         -|
+|  o ESCRIBIR_MEMORIA                  |       -|              -|         3|           1|  16384|       yes|       16385|  1.638e+05|   7.30|        -|        -|          -|           -|         -|
+| o CICLOS                             |       -|              -|    159776|           -|  14000|        no|  2236864000|  2.237e+10|   7.30|        -|        -|          -|           -|         -|
+|  o PASADAS                           |       -|              -|     79887|           -|      2|        no|      159774|  1.598e+06|   7.30|        -|        -|          -|           -|         -|
+|   + cgra_e4_Pipeline_PES_V1          |  Timing|              -|         -|       79884|      -|       yes|       79884|  7.988e+05|  -0.21|        -|  14 (1%)|  4243 (1%)|   6070 (5%)|    4 (6%)|
+|    o PES_V1                          |       -|              -|        88|          78|   1024|       yes|       79882|  7.988e+05|   7.30|        -|        -|          -|           -|         -|
++--------------------------------------+--------+---------------+----------+------------+-------+----------+------------+-----------+-------+---------+---------+-----------+------------+----------+
+    Name Prefix: '+' for module, 'o' for loop, '*' for dataflow
+
+
+================================================================
+== HW Interfaces
+================================================================
+* M_AXI
++-------------+------------+------------+---------------+---------+--------+----------+-----------+--------------+--------------+-------------+-------------+-------------------+
+| Interface   | Read/Write | Data Width | Address Width | Latency | Offset | Register | Max Widen | Max Read     | Max Write    | Num Read    | Num Write   | Resource Estimate |
+|             |            | (SW->HW)   |               |         |        |          | Bitwidth  | Burst Length | Burst Length | Outstanding | Outstanding |                   |
++-------------+------------+------------+---------------+---------+--------+----------+-----------+--------------+--------------+-------------+-------------+-------------------+
+| m_axi_gmem0 | READ_ONLY  | 64 -> 64   | 64            | 0       | slave  | 0        | 0         | 256          | 16           | 16          | 16          | BRAM=16           |
+| m_axi_gmem1 | READ_WRITE | 64 -> 64   | 64            | 0       | slave  | 0        | 0         | 16           | 16           | 16          | 16          | BRAM=4            |
++-------------+------------+------------+---------------+---------+--------+----------+-----------+--------------+--------------+-------------+-------------+-------------------+
+
+* S_AXILITE Interfaces
++---------------+------------+---------------+--------+----------+
+| Interface     | Data Width | Address Width | Offset | Register |
++---------------+------------+---------------+--------+----------+
+| s_axi_control | 32         | 7             | 16     | 0        |
++---------------+------------+---------------+--------+----------+
+
+* S_AXILITE Registers
++---------------+-----------+--------+-------+--------+----------------------------------+----------------------------------------------------------------------+
+| Interface     | Register  | Offset | Width | Access | Description                      | Bit Fields                                                           |
++---------------+-----------+--------+-------+--------+----------------------------------+----------------------------------------------------------------------+
+| s_axi_control | CTRL      | 0x00   | 32    | RW     | Control signals                  | 0=AP_START 1=AP_DONE 2=AP_IDLE 3=AP_READY 7=AUTO_RESTART 9=INTERRUPT |
+| s_axi_control | GIER      | 0x04   | 32    | RW     | Global Interrupt Enable Register | 0=Enable                                                             |
+| s_axi_control | IP_IER    | 0x08   | 32    | RW     | IP Interrupt Enable Register     | 0=CHAN0_INT_EN 1=CHAN1_INT_EN                                        |
+| s_axi_control | IP_ISR    | 0x0c   | 32    | RW     | IP Interrupt Status Register     | 0=CHAN0_INT_ST 1=CHAN1_INT_ST                                        |
+| s_axi_control | inst_1    | 0x10   | 32    | W      | Data signal of inst              |                                                                      |
+| s_axi_control | inst_2    | 0x14   | 32    | W      | Data signal of inst              |                                                                      |
+| s_axi_control | memoria_1 | 0x1c   | 32    | W      | Data signal of memoria           |                                                                      |
+| s_axi_control | memoria_2 | 0x20   | 32    | W      | Data signal of memoria           |                                                                      |
+| s_axi_control | estado_1  | 0x28   | 32    | W      | Data signal of estado            |                                                                      |
+| s_axi_control | estado_2  | 0x2c   | 32    | W      | Data signal of estado            |                                                                      |
+| s_axi_control | pes       | 0x34   | 32    | W      | Data signal of pes               |                                                                      |
+| s_axi_control | columnas  | 0x3c   | 32    | W      | Data signal of columnas          |                                                                      |
+| s_axi_control | ciclos    | 0x44   | 32    | W      | Data signal of ciclos            |                                                                      |
+| s_axi_control | ancho     | 0x4c   | 32    | W      | Data signal of ancho             |                                                                      |
+| s_axi_control | palabras  | 0x54   | 32    | W      | Data signal of palabras          |                                                                      |
++---------------+-----------+--------+-------+--------+----------------------------------+----------------------------------------------------------------------+
+
+* TOP LEVEL CONTROL
++-----------+------------+-----------+
+| Interface | Type       | Ports     |
++-----------+------------+-----------+
+| ap_clk    | clock      | ap_clk    |
+| ap_rst_n  | reset      | ap_rst_n  |
+| interrupt | interrupt  | interrupt |
+| ap_ctrl   | ap_ctrl_hs |           |
++-----------+------------+-----------+
+
+
+================================================================
+== SW I/O Information
+================================================================
+* Top Function Arguments
++----------+-----------+----------------------------+
+| Argument | Direction | Datatype                   |
++----------+-----------+----------------------------+
+| inst     | in        | unsigned long long const * |
+| memoria  | inout     | double*                    |
+| estado   | inout     | int*                       |
+| pes      | in        | unsigned int               |
+| columnas | in        | unsigned int               |
+| ciclos   | in        | unsigned int               |
+| ancho    | in        | unsigned int               |
+| palabras | in        | unsigned int               |
++----------+-----------+----------------------------+
+
+* SW-to-HW Mapping
++----------+---------------+-----------+----------+-------------------------------------+
+| Argument | HW Interface  | HW Type   | HW Usage | HW Info                             |
++----------+---------------+-----------+----------+-------------------------------------+
+| inst     | m_axi_gmem0   | interface |          | channel=0                           |
+| inst     | s_axi_control | register  | offset   | name=inst_1 offset=0x10 range=32    |
+| inst     | s_axi_control | register  | offset   | name=inst_2 offset=0x14 range=32    |
+| memoria  | m_axi_gmem1   | interface |          | channel=0                           |
+| memoria  | s_axi_control | register  | offset   | name=memoria_1 offset=0x1c range=32 |
+| memoria  | s_axi_control | register  | offset   | name=memoria_2 offset=0x20 range=32 |
+| estado   | m_axi_gmem1   | interface |          | channel=0                           |
+| estado   | s_axi_control | register  | offset   | name=estado_1 offset=0x28 range=32  |
+| estado   | s_axi_control | register  | offset   | name=estado_2 offset=0x2c range=32  |
+| pes      | s_axi_control | register  |          | name=pes offset=0x34 range=32       |
+| columnas | s_axi_control | register  |          | name=columnas offset=0x3c range=32  |
+| ciclos   | s_axi_control | register  |          | name=ciclos offset=0x44 range=32    |
+| ancho    | s_axi_control | register  |          | name=ancho offset=0x4c range=32     |
+| palabras | s_axi_control | register  |          | name=palabras offset=0x54 range=32  |
++----------+---------------+-----------+----------+-------------------------------------+
+
+
+================================================================
+== M_AXI Burst Information
+================================================================
+ Note: All burst requests might be further partitioned into multiple requests during RTL generation based on max_read_burst_length or max_write_burst_length settings.
+
+* Inferred Burst Summary
++--------------+-----------+----------+-------+------------------+--------------------+
+| HW Interface | Direction | Length   | Width | Loop             | Loop Location      |
++--------------+-----------+----------+-------+------------------+--------------------+
+| m_axi_gmem0  | read      | 4        | 64    |                  |                    |
+| m_axi_gmem1  | read      | variable | 64    | LEER_MEMORIA     | cgra_hls.cpp:246:5 |
+| m_axi_gmem1  | write     | variable | 64    | ESCRIBIR_MEMORIA | cgra_hls.cpp:352:5 |
++--------------+-----------+----------+-------+------------------+--------------------+
+
+* All M_AXI Variable Accesses
++--------------+----------+---------------------+-----------+--------------+----------+------------------+---------------------+------------+----------------------------------------------------------------------------------------------------------+
+| HW Interface | Variable | Access Location     | Direction | Burst Status | Length   | Loop             | Loop Location       | Resolution | Problem                                                                                                  |
++--------------+----------+---------------------+-----------+--------------+----------+------------------+---------------------+------------+----------------------------------------------------------------------------------------------------------+
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:57 | read      | Widen Fail   |          |                  |                     | 214-353    | Could not widen since type i64 size is greater than or equal to the max_widen_bitwidth threshold of 0    |
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:51 | read      | Widen Fail   |          |                  |                     | 214-353    | Could not widen since type i64 size is greater than or equal to the max_widen_bitwidth threshold of 0    |
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:45 | read      | Widen Fail   |          |                  |                     | 214-353    | Could not widen since type i64 size is greater than or equal to the max_widen_bitwidth threshold of 0    |
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:39 | read      | Widen Fail   |          |                  |                     | 214-353    | Could not widen since type i64 size is greater than or equal to the max_widen_bitwidth threshold of 0    |
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:57 | read      | Inferred     | 4        | PES_V1           | cgra_hls.cpp:267:13 |            |                                                                                                          |
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:51 | read      | Inferred     | 4        | PES_V1           | cgra_hls.cpp:267:13 |            |                                                                                                          |
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:45 | read      | Inferred     | 4        | PES_V1           | cgra_hls.cpp:267:13 |            |                                                                                                          |
+| m_axi_gmem0  | inst     | cgra_hls.cpp:271:39 | read      | Inferred     | 4        | PES_V1           | cgra_hls.cpp:267:13 |            |                                                                                                          |
+| m_axi_gmem1  | memoria  | cgra_hls.cpp:249:18 | read      | Widen Fail   |          | LEER_MEMORIA     | cgra_hls.cpp:246:5  | 214-353    | Could not widen since type double size is greater than or equal to the max_widen_bitwidth threshold of 0 |
+| m_axi_gmem1  | memoria  | cgra_hls.cpp:249:18 | read      | Inferred     | variable | LEER_MEMORIA     | cgra_hls.cpp:246:5  |            |                                                                                                          |
+| m_axi_gmem1  | memoria  | cgra_hls.cpp:355:20 | write     | Widen Fail   |          | ESCRIBIR_MEMORIA | cgra_hls.cpp:352:5  | 214-353    | Could not widen since type double size is greater than or equal to the max_widen_bitwidth threshold of 0 |
+| m_axi_gmem1  | memoria  | cgra_hls.cpp:355:20 | write     | Inferred     | variable | ESCRIBIR_MEMORIA | cgra_hls.cpp:352:5  |            |                                                                                                          |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:357:15 | write     | Fail         |          |                  |                     |            | Inferred burst reverted due to burst accesses data width is different from m_axi port width              |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:357:15 | write     | Widen Fail   |          |                  |                     | 214-353    | Could not widen since type i32 size is greater than or equal to the max_widen_bitwidth threshold of 0    |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:357:15 | write     | Inferred     | 3        |                  |                     |            |                                                                                                          |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:358:15 | write     | Fail         |          |                  |                     |            | Inferred burst reverted due to burst accesses data width is different from m_axi port width              |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:358:15 | write     | Widen Fail   |          |                  |                     | 214-353    | Could not widen since type i32 size is greater than or equal to the max_widen_bitwidth threshold of 0    |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:358:15 | write     | Inferred     | 3        |                  |                     |            |                                                                                                          |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:359:15 | write     | Fail         |          |                  |                     |            | Inferred burst reverted due to burst accesses data width is different from m_axi port width              |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:359:15 | write     | Widen Fail   |          |                  |                     | 214-353    | Could not widen since type i32 size is greater than or equal to the max_widen_bitwidth threshold of 0    |
+| m_axi_gmem1  | estado   | cgra_hls.cpp:359:15 | write     | Inferred     | 3        |                  |                     |            |                                                                                                          |
++--------------+----------+---------------------+-----------+--------------+----------+------------------+---------------------+------------+----------------------------------------------------------------------------------------------------------+
+
+    * Resolution URL: docs.amd.com/access/sources/dita/topic?Doc_Version=2026.1%20English&url=ug1448-hls-guidance&resourceid=XXX-YYY.html (replace XXX-YYY with column value)
+
+================================================================
+== Bind Op Report
+================================================================
++-------------------------------------------+-----+--------+-----------------------+-----------+------------------------+---------+
+| Name                                      | DSP | Pragma | Variable              | Op        | Impl                   | Latency |
++-------------------------------------------+-----+--------+-----------------------+-----------+------------------------+---------+
+| + cgra_e4                                 | 14  |        |                       |           |                        |         |
+|   add_ln256_1_fu_499_p2                   |     |        | add_ln256_1           | add       | fabric                 | 0       |
+|   icmp_ln256_fu_504_p2                    |     |        | icmp_ln256            | setlt     | auto                   | 0       |
+|   add_ln256_fu_509_p2                     |     |        | add_ln256             | add       | fabric                 | 0       |
+|   icmp_ln258_fu_523_p2                    |     |        | icmp_ln258            | seteq     | auto                   | 0       |
+|   icmp_ln265_fu_529_p2                    |     |        | icmp_ln265            | seteq     | auto                   | 0       |
+|   pasada_1_fu_535_p2                      |     |        | pasada_1              | add       | fabric                 | 0       |
+|   shl_ln360_fu_573_p2                     |     |        | shl_ln360             | shl       | auto_pipe              | 0       |
+|   shl_ln360_2_fu_591_p2                   |     |        | shl_ln360_2           | shl       | auto_pipe              | 0       |
+|   add_ln360_fu_617_p2                     |     |        | add_ln360             | add       | fabric                 | 0       |
+|   shl_ln360_3_fu_646_p2                   |     |        | shl_ln360_3           | shl       | auto_pipe              | 0       |
+|   shl_ln360_5_fu_663_p2                   |     |        | shl_ln360_5           | shl       | auto_pipe              | 0       |
+|   add_ln360_1_fu_679_p2                   |     |        | add_ln360_1           | add       | fabric                 | 0       |
+|   shl_ln360_6_fu_708_p2                   |     |        | shl_ln360_6           | shl       | auto_pipe              | 0       |
+|   shl_ln360_8_fu_725_p2                   |     |        | shl_ln360_8           | shl       | auto_pipe              | 0       |
+|  + cgra_e4_Pipeline_INICIO_REGS           | 0   |        |                       |           |                        |         |
+|    icmp_ln222_fu_86_p2                    |     |        | icmp_ln222            | seteq     | auto                   | 0       |
+|    add_ln222_fu_92_p2                     |     |        | add_ln222             | add       | fabric                 | 0       |
+|  + cgra_e4_Pipeline_INICIO_VECT           | 0   |        |                       |           |                        |         |
+|    icmp_ln228_fu_86_p2                    |     |        | icmp_ln228            | seteq     | auto                   | 0       |
+|    add_ln228_fu_92_p2                     |     |        | add_ln228             | add       | fabric                 | 0       |
+|  + cgra_e4_Pipeline_INICIO_LOCAL          | 0   |        |                       |           |                        |         |
+|    icmp_ln234_fu_86_p2                    |     |        | icmp_ln234            | seteq     | auto                   | 0       |
+|    add_ln234_fu_92_p2                     |     |        | add_ln234             | add       | fabric                 | 0       |
+|  + cgra_e4_Pipeline_INICIO_COLAS          | 0   |        |                       |           |                        |         |
+|    icmp_ln240_fu_72_p2                    |     |        | icmp_ln240            | seteq     | auto                   | 0       |
+|    add_ln240_fu_78_p2                     |     |        | add_ln240             | add       | fabric                 | 0       |
+|  + cgra_e4_Pipeline_LEER_MEMORIA          | 0   |        |                       |           |                        |         |
+|    icmp_ln246_fu_118_p2                   |     |        | icmp_ln246            | seteq     | auto                   | 0       |
+|    add_ln246_fu_124_p2                    |     |        | add_ln246             | add       | fabric                 | 0       |
+|  + cgra_e4_Pipeline_PES_V1                | 14  |        |                       |           |                        |         |
+|    icmp_ln125_fu_1585_p2                  |     |        | icmp_ln125            | setne     | auto                   | 0       |
+|    icmp_ln125_1_fu_1591_p2                |     |        | icmp_ln125_1          | setne     | auto                   | 0       |
+|    icmp_ln125_2_fu_1597_p2                |     |        | icmp_ln125_2          | setgt     | auto                   | 0       |
+|    icmp_ln125_3_fu_1603_p2                |     |        | icmp_ln125_3          | setne     | auto                   | 0       |
+|    icmp_ln72_fu_1609_p2                   |     |        | icmp_ln72             | seteq     | auto                   | 0       |
+|    icmp_ln72_1_fu_1615_p2                 |     |        | icmp_ln72_1           | setlt     | auto                   | 0       |
+|    icmp_ln72_2_fu_1621_p2                 |     |        | icmp_ln72_2           | seteq     | auto                   | 0       |
+|    icmp_ln156_fu_1627_p2                  |     |        | icmp_ln156            | seteq     | auto                   | 0       |
+|    xor_ln272_1_fu_1633_p2                 |     |        | xor_ln272_1           | xor       | auto                   | 0       |
+|    icmp_ln267_fu_1652_p2                  |     |        | icmp_ln267            | setlt     | auto                   | 0       |
+|    add_ln267_fu_1657_p2                   |     |        | add_ln267             | add       | fabric                 | 0       |
+|    add_ln269_fu_1676_p2                   |     |        | add_ln269             | add       | fabric                 | 0       |
+|    add_ln269_1_fu_1689_p2                 |     |        | add_ln269_1           | add       | fabric                 | 0       |
+|    icmp_ln269_fu_1694_p2                  |     |        | icmp_ln269            | seteq     | auto                   | 0       |
+|    icmp_ln94_fu_1795_p2                   |     |        | icmp_ln94             | seteq     | auto                   | 0       |
+|    icmp_ln94_1_fu_1800_p2                 |     |        | icmp_ln94_1           | seteq     | auto                   | 0       |
+|    or_ln94_fu_1805_p2                     |     |        | or_ln94               | or        | auto                   | 0       |
+|    xor_ln272_fu_1811_p2                   |     |        | xor_ln272             | xor       | auto                   | 0       |
+|    retval_0_i_i1_fu_1863_p8               |     |        | add_ln63              | add       | fabric                 | 0       |
+|    retval_0_i_i1_fu_1863_p6               |     |        | sub_ln60              | sub       | fabric                 | 0       |
+|    retval_0_i_i1_fu_1863_p4               |     |        | add_ln61              | add       | fabric                 | 0       |
+|    retval_0_i_i1_fu_1863_p2               |     |        | add_ln62              | add       | fabric                 | 0       |
+|    icmp_ln59_fu_1838_p2                   |     |        | icmp_ln59             | seteq     | auto                   | 0       |
+|    icmp_ln59_1_fu_1843_p2                 |     |        | icmp_ln59_1           | seteq     | auto                   | 0       |
+|    icmp_ln59_2_fu_1848_p2                 |     |        | icmp_ln59_2           | seteq     | auto                   | 0       |
+|    sparsemux_9_3_10_1_1_U17               |     |        | retval_0_i_i1         | sparsemux | onehotencoding_realdef | 0       |
+|    xor_ln100_fu_1903_p2                   |     |        | xor_ln100             | xor       | auto                   | 0       |
+|    q_fu_1931_p2                           |     |        | q                     | add       | fabric                 | 0       |
+|    grp_fu_1382_p2                         |     |        | icmp_ln101            | seteq     | auto                   | 0       |
+|    add_ln108_fu_2174_p2                   |     |        | add_ln108             | add       | fabric                 | 0       |
+|    add_ln104_fu_2213_p2                   |     |        | add_ln104             | add       | fabric                 | 0       |
+|    add_ln129_fu_1981_p2                   |     |        | add_ln129             | add       | fabric                 | 0       |
+|    add_ln129_1_fu_2000_p2                 |     |        | add_ln129_1           | add       | fabric                 | 0       |
+|    grp_fu_1388_p2                         |     |        | add_ln129_2           | add       | fabric                 | 0       |
+|    add_ln129_3_fu_2234_p2                 |     |        | add_ln129_3           | add       | fabric                 | 0       |
+|    grp_fu_1402_p2                         |     |        | add_ln129_4           | add       | fabric                 | 0       |
+|    add_ln129_5_fu_2251_p2                 |     |        | add_ln129_5           | add       | fabric                 | 0       |
+|    grp_fu_1407_p2                         |     |        | add_ln129_6           | add       | fabric                 | 0       |
+|    add_ln125_fu_2540_p2                   |     |        | add_ln125             | add       | fabric                 | 0       |
+|    grp_fu_1388_p2                         |     |        | add_ln125_1           | add       | fabric                 | 0       |
+|    add_ln125_2_fu_2810_p2                 |     |        | add_ln125_2           | add       | fabric                 | 0       |
+|    grp_fu_1402_p2                         |     |        | add_ln125_3           | add       | fabric                 | 0       |
+|    add_ln125_4_fu_2906_p2                 |     |        | add_ln125_4           | add       | fabric                 | 0       |
+|    grp_fu_1407_p2                         |     |        | add_ln125_5           | add       | fabric                 | 0       |
+|    add_ln125_6_fu_2923_p2                 |     |        | add_ln125_6           | add       | fabric                 | 0       |
+|    grp_fu_1369_p2                         |     |        | add_ln122             | add       | fabric                 | 0       |
+|    add_ln121_fu_2563_p2                   |     |        | add_ln121             | add       | fabric                 | 0       |
+|    add_ln142_fu_2289_p2                   |     |        | add_ln142             | add       | fabric                 | 0       |
+|    add_ln143_fu_2027_p2                   |     |        | add_ln143             | add       | fabric                 | 0       |
+|    add_ln144_fu_2051_p2                   |     |        | add_ln144             | add       | fabric                 | 0       |
+|    add_ln151_fu_2102_p2                   |     |        | add_ln151             | add       | fabric                 | 0       |
+|    icmp_ln151_fu_2606_p2                  |     |        | icmp_ln151            | setne     | auto                   | 0       |
+|    icmp_ln151_1_fu_2612_p2                |     |        | icmp_ln151_1          | seteq     | auto                   | 0       |
+|    or_ln151_fu_2618_p2                    |     |        | or_ln151              | or        | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_23                | dcmp      | auto                   | 1       |
+|    and_ln151_fu_2624_p2                   |     |        | and_ln151             | and       | auto                   | 0       |
+|    add_ln152_fu_2630_p2                   |     |        | add_ln152             | add       | fabric                 | 0       |
+|    add_ln152_1_fu_2642_p2                 |     |        | add_ln152_1           | add       | fabric                 | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i_i               | dadd      | fulldsp                | 4       |
+|    dmul_64ns_64ns_64_5_max_dsp_1_U14      | 11  |        | mul_i_i               | dmul      | maxdsp                 | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add_i_i               | dadd      | fulldsp                | 4       |
+|    ddiv_64ns_64ns_64_22_no_dsp_1_U15      |     |        | div_i_i               | ddiv      | fabric                 | 21      |
+|    add_ln152_2_fu_3340_p2                 |     |        | add_ln152_2           | add       | fabric                 | 0       |
+|    grp_fu_1369_p2                         |     |        | add_ln169             | add       | fabric                 | 0       |
+|    grp_fu_1412_p2                         |     |        | add_ln169_1           | add       | fabric                 | 0       |
+|    grp_fu_1412_p2                         |     |        | add_ln168             | add       | fabric                 | 0       |
+|    add_ln168_1_fu_2830_p2                 |     |        | add_ln168_1           | add       | fabric                 | 0       |
+|    grp_fu_1369_p2                         |     |        | add_ln166             | add       | fabric                 | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | t_12                  | dadd      | fulldsp                | 4       |
+|    icmp_ln74_fu_2350_p2                   |     |        | icmp_ln74             | setne     | auto                   | 0       |
+|    icmp_ln74_1_fu_2356_p2                 |     |        | icmp_ln74_1           | seteq     | auto                   | 0       |
+|    or_ln74_fu_3197_p2                     |     |        | or_ln74               | or        | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_2                 | dcmp      | auto                   | 1       |
+|    and_ln74_fu_3201_p2                    |     |        | and_ln74              | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub6_i_i              | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i52_i             | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add4_i_i              | dadd      | fulldsp                | 4       |
+|    compensacion_1_i_i_in_fu_3206_p3       |     |        | compensacion_1_i_i_in | select    | auto_sel               | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | compensacion          | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | t_14                  | dadd      | fulldsp                | 4       |
+|    icmp_ln74_2_fu_3043_p2                 |     |        | icmp_ln74_2           | setne     | auto                   | 0       |
+|    icmp_ln74_3_fu_3049_p2                 |     |        | icmp_ln74_3           | seteq     | auto                   | 0       |
+|    or_ln74_1_fu_3071_p2                   |     |        | or_ln74_1             | or        | auto                   | 0       |
+|    icmp_ln74_4_fu_3055_p2                 |     |        | icmp_ln74_4           | setne     | auto                   | 0       |
+|    icmp_ln74_5_fu_3061_p2                 |     |        | icmp_ln74_5           | seteq     | auto                   | 0       |
+|    or_ln74_2_fu_3075_p2                   |     |        | or_ln74_2             | or        | auto                   | 0       |
+|    and_ln74_1_fu_3079_p2                  |     |        | and_ln74_1            | and       | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_7                 | dcmp      | auto                   | 1       |
+|    and_ln74_2_fu_3085_p2                  |     |        | and_ln74_2            | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub6_i_i_1            | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add7_i_i_1            | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i52_i_1           | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add4_i_i_1            | dadd      | fulldsp                | 4       |
+|    add4_i_i_1_pn_fu_3330_p3               |     |        | add4_i_i_1_pn         | select    | auto_sel               | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | compensacion_1        | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | t_17                  | dadd      | fulldsp                | 4       |
+|    icmp_ln74_6_fu_3153_p2                 |     |        | icmp_ln74_6           | setne     | auto                   | 0       |
+|    icmp_ln74_7_fu_3159_p2                 |     |        | icmp_ln74_7           | seteq     | auto                   | 0       |
+|    or_ln74_3_fu_3177_p2                   |     |        | or_ln74_3             | or        | auto                   | 0       |
+|    icmp_ln74_8_fu_3165_p2                 |     |        | icmp_ln74_8           | setne     | auto                   | 0       |
+|    icmp_ln74_9_fu_3171_p2                 |     |        | icmp_ln74_9           | seteq     | auto                   | 0       |
+|    or_ln74_4_fu_3181_p2                   |     |        | or_ln74_4             | or        | auto                   | 0       |
+|    and_ln74_3_fu_3185_p2                  |     |        | and_ln74_3            | and       | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_11                | dcmp      | auto                   | 1       |
+|    and_ln74_4_fu_3191_p2                  |     |        | and_ln74_4            | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub6_i_i_2            | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add7_i_i_2            | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i52_i_2           | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add4_i_i_2            | dadd      | fulldsp                | 4       |
+|    add4_i_i_2_pn_fu_3551_p3               |     |        | add4_i_i_2_pn         | select    | auto_sel               | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | compensacion_2        | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | t                     | dadd      | fulldsp                | 4       |
+|    icmp_ln74_10_fu_3275_p2                |     |        | icmp_ln74_10          | setne     | auto                   | 0       |
+|    icmp_ln74_11_fu_3281_p2                |     |        | icmp_ln74_11          | seteq     | auto                   | 0       |
+|    or_ln74_5_fu_3299_p2                   |     |        | or_ln74_5             | or        | auto                   | 0       |
+|    icmp_ln74_12_fu_3287_p2                |     |        | icmp_ln74_12          | setne     | auto                   | 0       |
+|    icmp_ln74_13_fu_3293_p2                |     |        | icmp_ln74_13          | seteq     | auto                   | 0       |
+|    or_ln74_6_fu_3303_p2                   |     |        | or_ln74_6             | or        | auto                   | 0       |
+|    and_ln74_5_fu_3307_p2                  |     |        | and_ln74_5            | and       | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_16                | dcmp      | auto                   | 1       |
+|    and_ln74_6_fu_3313_p2                  |     |        | and_ln74_6            | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub6_i_i_3            | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add7_i_i_3            | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | compensacion_3        | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i52_i_3           | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add4_i_i_3            | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | compensacion_4        | dadd      | fulldsp                | 4       |
+|    xor_ln156_fu_3350_p2                   |     |        | xor_ln156             | xor       | auto                   | 0       |
+|    and_ln72_fu_3355_p2                    |     |        | and_ln72              | and       | auto                   | 0       |
+|    xor_ln72_fu_3360_p2                    |     |        | xor_ln72              | xor       | auto                   | 0       |
+|    and_ln72_1_fu_3365_p2                  |     |        | and_ln72_1            | and       | auto                   | 0       |
+|    xor_ln72_1_fu_3370_p2                  |     |        | xor_ln72_1            | xor       | auto                   | 0       |
+|    and_ln72_2_fu_3375_p2                  |     |        | and_ln72_2            | and       | auto                   | 0       |
+|    sparsemux_11_4_64_1_1_U18              |     |        | total_0_i_i           | sparsemux | onehotencoding_realdef | 0       |
+|    or_ln74_7_fu_3319_p2                   |     |        | or_ln74_7             | or        | auto                   | 0       |
+|    xor_ln74_fu_3324_p2                    |     |        | xor_ln74              | xor       | auto                   | 0       |
+|    sparsemux_13_5_64_1_1_U19              |     |        | compensacion_6        | sparsemux | onehotencoding_realdef | 0       |
+|    icmp_ln81_fu_3665_p2                   |     |        | icmp_ln81             | setne     | auto                   | 0       |
+|    icmp_ln81_1_fu_3671_p2                 |     |        | icmp_ln81_1           | seteq     | auto                   | 0       |
+|    or_ln81_fu_3677_p2                     |     |        | or_ln81               | or        | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_18                | dcmp      | auto                   | 1       |
+|    and_ln81_fu_3696_p2                    |     |        | and_ln81              | and       | auto                   | 0       |
+|    xor_ln81_fu_3700_p2                    |     |        | xor_ln81              | xor       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add11_i_i             | dadd      | fulldsp                | 4       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | _ln567                | dcmp      | auto                   | 1       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | _ln567                | dcmp      | auto                   | 1       |
+|    xor_ln567_fu_3706_p2                   |     |        | _ln567                | xor       | auto                   | 0       |
+|    xor_ln567_fu_3711_p2                   |     |        | _ln567                | xor       | auto                   | 0       |
+|    and_ln567_fu_3717_p2                   |     |        | _ln567                | and       | auto                   | 0       |
+|    and_ln567_fu_3723_p2                   |     |        | and_ln567             | and       | auto                   | 0       |
+|    and_ln567_1_fu_3728_p2                 |     |        | and_ln567_1           | and       | auto                   | 0       |
+|    cond_i_i_fu_3734_p3                    |     |        | cond_i_i              | select    | auto_sel               | 0       |
+|    add_ln162_fu_3433_p2                   |     |        | add_ln162             | add       | fabric                 | 0       |
+|    icmp_ln157_fu_2388_p2                  |     |        | icmp_ln157            | seteq     | auto                   | 0       |
+|    icmp_ln157_1_fu_2694_p2                |     |        | icmp_ln157_1          | setne     | auto                   | 0       |
+|    icmp_ln157_2_fu_2700_p2                |     |        | icmp_ln157_2          | seteq     | auto                   | 0       |
+|    or_ln157_fu_2706_p2                    |     |        | or_ln157              | or        | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_25                | dcmp      | auto                   | 1       |
+|    and_ln157_4_fu_2712_p2                 |     |        | and_ln157_4           | and       | auto                   | 0       |
+|    and_ln157_fu_2718_p2                   |     |        | and_ln157             | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i55_i             | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add_i53_i             | dadd      | fulldsp                | 4       |
+|    dmul_64ns_64ns_64_5_max_dsp_1_U14      | 11  |        | mul_i57_i             | dmul      | maxdsp                 | 4       |
+|    ddiv_64ns_64ns_64_22_no_dsp_1_U15      |     |        | div_i59_i             | ddiv      | fabric                 | 21      |
+|    icmp_ln157_3_fu_3478_p2                |     |        | icmp_ln157_3          | setne     | auto                   | 0       |
+|    icmp_ln157_4_fu_3484_p2                |     |        | icmp_ln157_4          | seteq     | auto                   | 0       |
+|    or_ln157_1_fu_3490_p2                  |     |        | or_ln157_1            | or        | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_27                | dcmp      | auto                   | 1       |
+|    and_ln157_5_fu_3496_p2                 |     |        | and_ln157_5           | and       | auto                   | 0       |
+|    and_ln157_1_fu_3502_p2                 |     |        | and_ln157_1           | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i55_i_1           | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add_i53_i_1           | dadd      | fulldsp                | 4       |
+|    dmul_64ns_64ns_64_5_max_dsp_1_U14      | 11  |        | mul_i57_i_1           | dmul      | maxdsp                 | 4       |
+|    ddiv_64ns_64ns_64_22_no_dsp_1_U15      |     |        | div_i59_i_1           | ddiv      | fabric                 | 21      |
+|    icmp_ln157_5_fu_3576_p2                |     |        | icmp_ln157_5          | setne     | auto                   | 0       |
+|    icmp_ln157_6_fu_3582_p2                |     |        | icmp_ln157_6          | seteq     | auto                   | 0       |
+|    or_ln157_2_fu_3588_p2                  |     |        | or_ln157_2            | or        | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_29                | dcmp      | auto                   | 1       |
+|    and_ln157_6_fu_3594_p2                 |     |        | and_ln157_6           | and       | auto                   | 0       |
+|    and_ln157_2_fu_3600_p2                 |     |        | and_ln157_2           | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i55_i_2           | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add_i53_i_2           | dadd      | fulldsp                | 4       |
+|    dmul_64ns_64ns_64_5_max_dsp_1_U14      | 11  |        | mul_i57_i_2           | dmul      | maxdsp                 | 4       |
+|    ddiv_64ns_64ns_64_22_no_dsp_1_U15      |     |        | div_i59_i_2           | ddiv      | fabric                 | 21      |
+|    icmp_ln157_7_fu_3783_p2                |     |        | icmp_ln157_7          | setne     | auto                   | 0       |
+|    icmp_ln157_8_fu_3789_p2                |     |        | icmp_ln157_8          | seteq     | auto                   | 0       |
+|    or_ln157_3_fu_3795_p2                  |     |        | or_ln157_3            | or        | auto                   | 0       |
+|    dcmp_64ns_64ns_1_2_no_dsp_1_U16        |     |        | tmp_31                | dcmp      | auto                   | 1       |
+|    and_ln157_7_fu_3801_p2                 |     |        | and_ln157_7           | and       | auto                   | 0       |
+|    and_ln157_3_fu_3807_p2                 |     |        | and_ln157_3           | and       | auto                   | 0       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | sub_i55_i_3           | dadd      | fulldsp                | 4       |
+|    dadddsub_64ns_64ns_64_5_full_dsp_1_U13 | 3   |        | add_i53_i_3           | dadd      | fulldsp                | 4       |
+|    dmul_64ns_64ns_64_5_max_dsp_1_U14      | 11  |        | mul_i57_i_3           | dmul      | maxdsp                 | 4       |
+|    ddiv_64ns_64ns_64_22_no_dsp_1_U15      |     |        | div_i59_i_3           | ddiv      | fabric                 | 21      |
+|    grp_fu_1412_p2                         |     |        | add_ln172             | add       | fabric                 | 0       |
+|    grp_fu_1412_p2                         |     |        | add_ln176             | add       | fabric                 | 0       |
+|    q_1_fu_2149_p2                         |     |        | q_1                   | add       | fabric                 | 0       |
+|    grp_fu_1382_p2                         |     |        | icmp_ln181            | seteq     | auto                   | 0       |
+|    icmp_ln182_fu_2428_p2                  |     |        | icmp_ln182            | seteq     | auto                   | 0       |
+|    icmp_ln182_1_fu_2433_p2                |     |        | icmp_ln182_1          | seteq     | auto                   | 0       |
+|    and_ln182_fu_2439_p2                   |     |        | and_ln182             | and       | auto                   | 0       |
+|    icmp_ln183_fu_2445_p2                  |     |        | icmp_ln183            | seteq     | auto                   | 0       |
+|    icmp_ln183_1_fu_2450_p2                |     |        | icmp_ln183_1          | seteq     | auto                   | 0       |
+|    and_ln183_fu_2456_p2                   |     |        | and_ln183             | and       | auto                   | 0       |
+|    add_ln186_fu_2771_p2                   |     |        | add_ln186             | add       | fabric                 | 0       |
+|    add_ln148_fu_2872_p2                   |     |        | add_ln148             | add       | fabric                 | 0       |
+|    icmp_ln282_fu_3832_p2                  |     |        | icmp_ln282            | setne     | auto                   | 0       |
+|    ciclo_error_fu_3838_p3                 |     |        | ciclo_error           | select    | auto_sel               | 0       |
+|    pe_error_fu_3845_p3                    |     |        | pe_error              | select    | auto_sel               | 0       |
+|  + cgra_e4_Pipeline_ESCRIBIR_MEMORIA      | 0   |        |                       |           |                        |         |
+|    icmp_ln352_fu_119_p2                   |     |        | icmp_ln352            | seteq     | auto                   | 0       |
+|    add_ln352_fu_125_p2                    |     |        | add_ln352             | add       | fabric                 | 0       |
++-------------------------------------------+-----+--------+-----------------------+-----------+------------------------+---------+
+
+
+================================================================
+== Storage Report
+================================================================
++----------------------------+-----------+-----------+------+------+--------+--------+-----------+------+---------+------------------+
+| Name                       | Usage     | Type      | BRAM | URAM | CE_REG | Pragma | Variable  | Impl | Latency | Bitwidth, Depth, |
+|                            |           |           |      |      |        |        |           |      |         | Banks            |
++----------------------------+-----------+-----------+------+------+--------+--------+-----------+------+---------+------------------+
+| + cgra_e4                  |           |           | 21   | 36   |        |        |           |      |         |                  |
+|   control_s_axi_U          | interface | s_axilite |      |      |        |        |           |      |         |                  |
+|   gmem0_m_axi_U            | interface | m_axi     | 16   |      |        |        |           |      |         |                  |
+|   gmem1_m_axi_U            | interface | m_axi     | 4    |      |        |        |           |      |         |                  |
+|   regs_U                   | ram_2p    |           |      | 4    | N      | pragma | regs      | uram | 1       | 64, 16384, 1     |
+|   vect_U                   | ram_2p    |           |      | 8    | N      | pragma | vect      | uram | 1       | 64, 32768, 1     |
+|   local_s_U                | ram_2p    |           |      | 16   | N      | pragma | local_s   | uram | 1       | 64, 65536, 1     |
+|   contenido_U              | ram_1p    |           | 1    |      | N      |        | contenido | auto | 1       | 2, 4096, 1       |
+|   mem_U                    | ram_2p    |           |      | 4    | N      | pragma | mem       | uram | 1       | 64, 16384, 1     |
+|  + cgra_e4_Pipeline_PES_V1 |           |           | 0    | 4    |        |        |           |      |         |                  |
+|    cola_U                  | ram_2p    |           |      | 4    | N      | pragma | cola      | uram | 1       | 64, 16384, 1     |
++----------------------------+-----------+-----------+------+------+--------+--------+-----------+------+---------+------------------+
+
+
+================================================================
+== Pragma Report
+================================================================
+* Inferred Pragmas
++----------+---------+-----------------------------------------------------------------+-------------------------------+
+| Type     | Options | Location                                                        | Inferred From                 |
++----------+---------+-----------------------------------------------------------------+-------------------------------+
+| PIPELINE |         | loop PES_V1 (cgra_hls.cpp:267:13) in cgra_e4 (cgra_hls.cpp:267) | syn.compile.pipeline_loops=64 |
++----------+---------+-----------------------------------------------------------------+-------------------------------+
+
+* Implemented Pragmas
++----------------+-------------------------------+---------------------------------------------------------+
+| Type           | Options                       | Location                                                |
++----------------+-------------------------------+---------------------------------------------------------+
+| INLINE         |                               | in _zl11decodificaryyyy (cgra_hls.cpp:42)               |
+| INLINE         |                               | in _zl6vecinojjj (cgra_hls.cpp:58)                      |
+| INLINE         |                               | in _zl11suma_pythonpkdj (cgra_hls.cpp:69)               |
+| INLINE         |                               | in _zl6operarjdd (cgra_hls.cpp:85)                      |
+| INLINE         |                               | in _zl6enviarrk4instjjj (cgra_hls.cpp:99)               |
+| INLINE         |                               | in _zl15acceder_memoriark4instjj (cgra_hls.cpp:117)     |
+| INLINE         |                               | in _zl8computarrk4instjj (cgra_hls.cpp:138)             |
+| LOOP_TRIPCOUNT | max=16384 min=256 avg=8320    | in cgra_e4_pipeline_inicio_regs (cgra_hls.cpp:223)      |
+| LOOP_TRIPCOUNT | max=32768 min=512 avg=16640   | in cgra_e4_pipeline_inicio_vect (cgra_hls.cpp:229)      |
+| LOOP_TRIPCOUNT | max=65536 min=1024 avg=33280  | in cgra_e4_pipeline_inicio_local (cgra_hls.cpp:235)     |
+| LOOP_TRIPCOUNT | max=4096 min=64 avg=2080      | in cgra_e4_pipeline_inicio_colas (cgra_hls.cpp:241)     |
+| LOOP_TRIPCOUNT | max=16384 min=16384 avg=16384 | in cgra_e4_pipeline_leer_memoria (cgra_hls.cpp:247)     |
+| LOOP_TRIPCOUNT | max=14000 min=40 avg=7020     | in cgra_e4 (cgra_hls.cpp:257)                           |
+| LOOP_TRIPCOUNT | max=1024 min=16 avg=520       | in cgra_e4_pipeline_pes_v1 (cgra_hls.cpp:268)           |
+| LOOP_TRIPCOUNT | max=16384 min=16384 avg=16384 | in cgra_e4_pipeline_escribir_memoria (cgra_hls.cpp:353) |
++----------------+-------------------------------+---------------------------------------------------------+
+
+* Valid Pragma Syntax
++----------------+-------------------------------------------------------------------------------------------+---------------------------------------+
+| Type           | Options                                                                                   | Location                              |
++----------------+-------------------------------------------------------------------------------------------+---------------------------------------+
+| INLINE         |                                                                                           | in decodificar (cgra_hls.cpp:42)      |
+| INLINE         |                                                                                           | in vecino (cgra_hls.cpp:58)           |
+| INLINE         |                                                                                           | in suma_python (cgra_hls.cpp:69)      |
+| INLINE         |                                                                                           | in operar (cgra_hls.cpp:85)           |
+| INLINE         |                                                                                           | in enviar (cgra_hls.cpp:99)           |
+| INLINE         |                                                                                           | in acceder_memoria (cgra_hls.cpp:117) |
+| INLINE         |                                                                                           | in computar (cgra_hls.cpp:138)        |
+| INTERFACE      | m_axi port = inst offset = slave bundle = gmem0 depth = 99008 max_read_burst_length = 256 | in cgra_e4 (cgra_hls.cpp:204)         |
+| INTERFACE      | m_axi port = memoria offset = slave bundle = gmem1 depth = 16384                          | in cgra_e4 (cgra_hls.cpp:205)         |
+| INTERFACE      | m_axi port = estado offset = slave bundle = gmem1 depth = 4                               | in cgra_e4 (cgra_hls.cpp:206)         |
+| INTERFACE      | s_axilite port = pes                                                                      | in cgra_e4 (cgra_hls.cpp:207)         |
+| INTERFACE      | s_axilite port = columnas                                                                 | in cgra_e4 (cgra_hls.cpp:208)         |
+| INTERFACE      | s_axilite port = ciclos                                                                   | in cgra_e4 (cgra_hls.cpp:209)         |
+| INTERFACE      | s_axilite port = ancho                                                                    | in cgra_e4 (cgra_hls.cpp:210)         |
+| INTERFACE      | s_axilite port = palabras                                                                 | in cgra_e4 (cgra_hls.cpp:211)         |
+| INTERFACE      | s_axilite port = return                                                                   | in cgra_e4 (cgra_hls.cpp:212)         |
+| BIND_STORAGE   | variable = regs type = ram_2p impl = uram                                                 | in cgra_e4 (cgra_hls.cpp:214)         |
+| BIND_STORAGE   | variable = vect type = ram_2p impl = uram                                                 | in cgra_e4 (cgra_hls.cpp:215)         |
+| BIND_STORAGE   | variable = local_ type = ram_2p impl = uram                                               | in cgra_e4 (cgra_hls.cpp:216)         |
+| BIND_STORAGE   | variable = cola type = ram_2p impl = uram                                                 | in cgra_e4 (cgra_hls.cpp:217)         |
+| BIND_STORAGE   | variable = mem type = ram_2p impl = uram                                                  | in cgra_e4 (cgra_hls.cpp:218)         |
+| LOOP_TRIPCOUNT | min = 256 max = 16384                                                                     | in cgra_e4 (cgra_hls.cpp:223)         |
+| PIPELINE       | II = 1                                                                                    | in cgra_e4 (cgra_hls.cpp:224)         |
+| LOOP_TRIPCOUNT | min = 512 max = 32768                                                                     | in cgra_e4 (cgra_hls.cpp:229)         |
+| PIPELINE       | II = 1                                                                                    | in cgra_e4 (cgra_hls.cpp:230)         |
+| LOOP_TRIPCOUNT | min = 1024 max = 65536                                                                    | in cgra_e4 (cgra_hls.cpp:235)         |
+| PIPELINE       | II = 1                                                                                    | in cgra_e4 (cgra_hls.cpp:236)         |
+| LOOP_TRIPCOUNT | min = 64 max = 4096                                                                       | in cgra_e4 (cgra_hls.cpp:241)         |
+| PIPELINE       | II = 1                                                                                    | in cgra_e4 (cgra_hls.cpp:242)         |
+| LOOP_TRIPCOUNT | min = 16384 max = 16384                                                                   | in cgra_e4 (cgra_hls.cpp:247)         |
+| PIPELINE       | II = 1                                                                                    | in cgra_e4 (cgra_hls.cpp:248)         |
+| LOOP_TRIPCOUNT | min = 40 max = 14000                                                                      | in cgra_e4 (cgra_hls.cpp:257)         |
+| LOOP_TRIPCOUNT | min = 16 max = 1024                                                                       | in cgra_e4 (cgra_hls.cpp:268)         |
+| LOOP_TRIPCOUNT | min = 16384 max = 16384                                                                   | in cgra_e4 (cgra_hls.cpp:353)         |
+| PIPELINE       | II = 1                                                                                    | in cgra_e4 (cgra_hls.cpp:354)         |
++----------------+-------------------------------------------------------------------------------------------+---------------------------------------+
+
+
