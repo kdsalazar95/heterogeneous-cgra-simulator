@@ -18,7 +18,10 @@ variante=${2:-O2}
 c=$(cd "$(dirname "$0")/.." && pwd)    # cgra/c
 repo=$(cd "$c/../.." && pwd)
 entradas=$c/perfilado/entradas
-export CC=${CC:-$HOME/micromamba/envs/cuda/bin/x86_64-conda-linux-gnu-gcc}
+# El gcc de micromamba si existe (PC de Katherine); si no, el del sistema (Jetson, KV260).
+cc_conda=$HOME/micromamba/envs/cuda/bin/x86_64-conda-linux-gnu-gcc
+[[ -x $cc_conda ]] || cc_conda=gcc
+export CC=${CC:-$cc_conda}
 export OPT=-O2
 OPENMP=${OPENMP--fopenmp}
 

@@ -25,15 +25,18 @@ CXX=${CXX:-g++}
 NVCC=${NVCC:-/usr/local/cuda/bin/nvcc}
 ARCH=${ARCH:-sm_53}
 CUDA_LIB=${CUDA_LIB:-}
+# E2 (lectura de los PE*.txt) en paralelo, igual que el Makefile. OPENMP= compila E2 secuencial.
+OPENMP=${OPENMP--fopenmp}
 obj=$c/build/gpu_$variante
 rm -rf "$obj"
 mkdir -p "$obj"
 
 for f in "$c"/src/*.c; do
-    $CC -std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L -O2 -ffp-contract=off -DCGRA_GPU $defs \
+    $CC -std=c11 -Wall -Wextra -D_POSIX_C_SOURCE=200809L -O2 -ffp-contract=off -DCGRA_GPU $defs $OPENMP \
         -I"$c/include" -DCGRA_RAIZ="\"$raiz\"" -c "$f" -o "$obj/$(basename "$f" .c).o"
 done
 $NVCC -O2 -arch="$ARCH" -ccbin "$CXX" $defs -I"$c/include" -c "$c/src/reporte_cuda.cu" -o "$obj/reporte_cuda.o"
-$NVCC -arch="$ARCH" -ccbin "$CXX" "$obj"/*.o -o "$c/build/cgra_gpu_$variante" ${CUDA_LIB:+-L"$CUDA_LIB"} -lm -lpthread
+$NVCC -arch="$ARCH" -ccbin "$CXX" ${OPENMP:+-Xcompiler "$OPENMP"} "$obj"/*.o -o "$c/build/cgra_gpu_$variante" \
+    ${CUDA_LIB:+-L"$CUDA_LIB"} -lm -lpthread
 
 echo "$c/build/cgra_gpu_$variante"
